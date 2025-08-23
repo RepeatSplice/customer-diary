@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# certs
+certs/*.pem
+
 # production
 /build
 
