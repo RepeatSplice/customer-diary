@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Customer Diary
 
-## Getting Started
+A modern, internal tool for tracking customer diaries and orders—built with **Next.js 15**, **TypeScript**, **Tailwind CSS**, **shadcn/ui**, **Framer Motion**, **Supabase** (Postgres + Storage), and **Drizzle ORM**.
 
-First, run the development server:
+> **Note**  
+> This project is **not affiliated with, endorsed by, or approved by Burnsco**.  
+> It was created by **Ben (Krona Digital)** for personal/staff use. Any references to Burnsco are purely contextual.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## ✨ Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Diaries**: create, track, and update customer diaries (status, priority, flags, due dates, totals)
+- **Attachments**: image/PDF drag-drop uploads (Supabase Storage), inline preview & remove
+- **Products**: line items with qty/price/discount/tax and auto totals
+- **Follow-ups**: timeline (note/call/sms/email), with manager-only rules
+- **Dashboard**: stat cards (Active/Overdue/Completed), grid, filters & search
+- **Customers**: full-width table with search, sorting, and safe delete UX
+- **Staff Admin (manager-only)**: add staff/managers, list below
+- **Feedback**: in-app feature/bug board with **voting**, **manager-only comments**, pin & status
+- **Auth**: NextAuth with role-based UI (staff / manager)
+- **UI/UX**: green-themed, rounded-xl, soft shadows, subtle motion
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 🧱 Tech Stack
 
-To learn more about Next.js, take a look at the following resources:
+- **Framework**: Next.js 15 (App Router, RSC where applicable)
+- **UI**: Tailwind CSS 4, shadcn/ui, Lucide Icons, Framer Motion
+- **Data**: Supabase (Postgres, Storage), Drizzle ORM & drizzle-kit
+- **Auth**: NextAuth (Credentials)
+- **Forms**: React Hook Form + Zod
+- **State/Data**: SWR for client fetching
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🚀 Getting Started
 
-## Deploy on Vercel
+### 1) Environment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Create `.env.local`:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+SUPABASE_ATTACHMENTS_BUCKET=Attachments
+
+# Database (Postgres via Supabase)
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/postgres?sslmode=require
+
+# NextAuth
+NEXTAUTH_SECRET=replace_me
+NEXTAUTH_URL=http://localhost:3000
