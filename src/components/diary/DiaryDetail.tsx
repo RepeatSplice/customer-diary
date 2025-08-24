@@ -9,8 +9,6 @@ import {
   Printer,
   Tag,
   Archive,
-  Copy,
-  Share2,
   ShieldAlert,
   AlertCircle,
 } from "lucide-react";
@@ -54,8 +52,30 @@ import { ProductEditor } from "@/components/products/ProductEditor";
 import { Attachments } from "@/components/diary/Attachments";
 import { Followups } from "@/components/diary/Followups";
 import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/hooks/use-mobile";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+type StaffMember = {
+  id: string;
+  fullName: string;
+  staffCode: string;
+  role: "staff" | "manager";
+};
+
+const fetcher = async (url: string) => {
+  const response = await fetch(url);
+
+  if (response.status === 401) {
+    // Redirect to sign-in if unauthorized
+    window.location.href = "/sign-in";
+    throw new Error("Unauthorized");
+  }
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.json();
+};
 
 // Map for pretty labels ↔ enum values
 const STATUS_LABELS: Record<string, string> = {
@@ -79,6 +99,18 @@ type Patchable = {
   whatTheyWant?: string;
   adminNotes?: string;
   dueDate?: string | null; // yyyy-mm-dd
+  // Payment fields
+  paymentMethod?: string;
+  amountPaid?: string; // Keep as string to match database
+  invoicePO?: string;
+  paidAt?: string | null; // yyyy-mm-dd
+  // Additional fields
+  storeLocation?: string;
+  tags?: string;
+  // Total amount
+  total?: string;
+  // Staff assignment
+  assignedTo?: string | null; // UUID of assigned staff member
 };
 
 // simple deep-equal
@@ -86,18 +118,16 @@ const isEqual = (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b);
 
 export default function DiaryDetail({ id }: { id: string }) {
   const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuth();
   const { data, mutate } = useSWR(`/api/diaries/${id}`, fetcher);
   const [dirty, setDirty] = useState(false);
 
+  // Staff data
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(true);
+
   // local editable state (only existing API fields)
   const [form, setForm] = useState<Patchable | null>(null);
-
-  // UI-only fields for future wiring (won’t be sent today)
-  const [tags, setTags] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<string>("");
-  const [amountPaid, setAmountPaid] = useState<string>("");
-  const [invoicePO, setInvoicePO] = useState<string>("");
-  const [paidAt, setPaidAt] = useState<string>(""); // yyyy-mm-dd
 
   // dialogs
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -108,6 +138,9 @@ export default function DiaryDetail({ id }: { id: string }) {
 
   useEffect(() => {
     if (!data) return;
+
+    console.log("Initializing form with data:", data);
+
     // initialize local form from server
     const initial: Patchable = {
       status: data.status,
@@ -118,16 +151,45 @@ export default function DiaryDetail({ id }: { id: string }) {
       whatTheyWant: data.whatTheyWant,
       adminNotes: data.adminNotes ?? "",
       dueDate: data.dueDate ?? null,
+      // Payment fields
+      paymentMethod: data.paymentMethod ?? "",
+      amountPaid: data.amountPaid ?? "",
+      invoicePO: data.invoicePO ?? "",
+      paidAt: data.paidAt ?? null,
+      // Additional fields
+      storeLocation: data.storeLocation ?? "",
+      tags: data.tags ?? "",
+      // Total amount
+      total: data.total ?? "",
+      // Staff assignment
+      assignedTo: data.assignedTo ?? null,
     };
+
+    console.log("Setting initial form state:", initial);
     setForm(initial);
     setDirty(false);
-    // UI-only fields — load if your API later includes them
-    setTags(data.tags ?? "");
-    setPaymentMethod(data.paymentMethod ?? "");
-    setAmountPaid(data.amountPaid ?? "");
-    setInvoicePO(data.invoicePO ?? "");
-    setPaidAt(data.paidAt ?? "");
   }, [data]);
+
+  // Fetch staff members on component mount
+  useEffect(() => {
+    async function fetchStaff() {
+      try {
+        const res = await fetch("/api/staff-users?public=true");
+        if (res.ok) {
+          const data = await res.json();
+          setStaffMembers(data.items || []);
+        } else {
+          console.error("Failed to fetch staff members");
+        }
+      } catch (error) {
+        console.error("Error fetching staff:", error);
+      } finally {
+        setIsLoadingStaff(false);
+      }
+    }
+
+    fetchStaff();
+  }, []);
 
   // detect dirty
   const initialComparable = useMemo(() => {
@@ -141,6 +203,18 @@ export default function DiaryDetail({ id }: { id: string }) {
       whatTheyWant: data.whatTheyWant,
       adminNotes: data.adminNotes ?? "",
       dueDate: data.dueDate ?? null,
+      // Payment fields
+      paymentMethod: data.paymentMethod ?? "",
+      amountPaid: data.amountPaid ?? "",
+      invoicePO: data.invoicePO ?? "",
+      paidAt: data.paidAt ?? null,
+      // Additional fields
+      storeLocation: data.storeLocation ?? "",
+      tags: data.tags ?? "",
+      // Total amount
+      total: data.total ?? "",
+      // Staff assignment
+      assignedTo: data.assignedTo ?? null,
     };
     return obj;
   }, [data]);
@@ -149,6 +223,11 @@ export default function DiaryDetail({ id }: { id: string }) {
     if (!form || !initialComparable) return;
     setDirty(!isEqual(form, initialComparable));
   }, [form, initialComparable]);
+
+  // Debug: log form changes
+  useEffect(() => {
+    console.log("Form state changed:", form);
+  }, [form]);
 
   // ---- Unsaved-changes guard ----
   // browser refresh / close
@@ -181,17 +260,38 @@ export default function DiaryDetail({ id }: { id: string }) {
 
   async function doSave() {
     if (!form) return;
+
+    console.log("Saving form data:", form);
+
     const res = await fetch(`/api/diaries/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
+
+    console.log("Save response status:", res.status);
+
+    // Handle unauthorized access
+    if (res.status === 401) {
+      toast({
+        title: "Session expired",
+        description: "Please sign in again",
+        variant: "destructive",
+        duration: 5000,
+      });
+      window.location.href = "/sign-in";
+      return;
+    }
+
     if (res.ok) {
+      const responseData = await res.json();
+      console.log("Save successful:", responseData);
       toast({ title: "Saved", duration: 10000 }); // 10 seconds
       await mutate();
       setDirty(false);
     } else {
       const msg = await res.text();
+      console.error("Save failed:", msg);
       toast({
         title: "Save failed",
         description: msg || "Check fields and try again",
@@ -212,20 +312,33 @@ export default function DiaryDetail({ id }: { id: string }) {
 
   if (!data || !form) return <div className="px-6 py-10">Loading…</div>;
 
+  // Show loading while checking authentication
+  if (isLoading)
+    return <div className="px-6 py-10">Checking authentication…</div>;
+
+  // Redirect if not authenticated (this will be handled by useAuth hook)
+  if (!isAuthenticated) return null;
+
   const totals = {
     subtotal: data.subtotal,
-    tax: data.tax,
-    total: data.total,
+    total: form?.total || data.total,
     // balance if you wire amountPaid later
     balance: (() => {
-      const tot = Number(data.total || 0);
-      const paid = Number(amountPaid || 0);
+      const tot = Number(form?.total || data.total || 0);
+      const paid = Number(form?.amountPaid || "0");
       return (tot - paid).toFixed(2);
     })(),
   };
 
-  const set = <K extends keyof Patchable>(key: K, value: Patchable[K]) =>
-    setForm((p) => (p ? { ...p, [key]: value } : p));
+  const set = <K extends keyof Patchable>(key: K, value: Patchable[K]) => {
+    console.log(`Setting ${key} to:`, value);
+    setForm((p) => {
+      if (!p) return p;
+      const newForm = { ...p, [key]: value };
+      console.log("New form state:", newForm);
+      return newForm;
+    });
+  };
 
   function onStatusChange(next: string) {
     // Manager override if marking Collected while not paid
@@ -239,66 +352,90 @@ export default function DiaryDetail({ id }: { id: string }) {
   return (
     <div className="w-full px-6 pb-24">
       {/* Sticky header */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex items-center justify-between py-3">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full"
-              onClick={backClicked}
-              aria-label="Back"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <div className="text-lg font-semibold">Diary</div>
-              <div className="text-xs text-muted-foreground">
-                {data.customer?.name} · {data.customer?.phone}
+      <Card className="sticky top-0 z-10">
+        <CardContent className="px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full"
+                onClick={backClicked}
+                aria-label="Back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <div className="text-lg font-semibold">
+                  Diary Detail for {data.customer?.name}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2">
-            <StatusBadge status={form.status as any} />
-            <PriorityBadge priority={form.priority as any} />
-            <Button variant="outline" asChild className="hidden sm:inline-flex">
-              <Link
-                href={`/diary/${id}/print`}
-                target="_blank"
-                rel="noopener noreferrer"
+            <div className="flex items-center gap-2">
+              <StatusBadge status={form.status as any} />
+              <PriorityBadge priority={form.priority as any} />
+              <Button
+                variant="outline"
+                asChild
+                className="hidden sm:inline-flex"
               >
-                <Printer className="mr-2 h-4 w-4" /> Print
-              </Link>
-            </Button>
-            <Button variant="outline" asChild className="hidden sm:inline-flex">
-              <Link
-                href={`/diary/${id}/label`}
-                target="_blank"
-                rel="noopener noreferrer"
+                <Link
+                  href={`/diary/${id}/print`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Printer className="mr-2 h-4 w-4" /> Print
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                asChild
+                className="hidden sm:inline-flex"
               >
-                <Tag className="mr-2 h-4 w-4" /> Label
-              </Link>
-            </Button>
-            <Button variant="outline" className="hidden sm:inline-flex">
-              <Archive className="mr-2 h-4 w-4" /> Archive
-            </Button>
-            <Button variant="outline" className="hidden sm:inline-flex">
-              <Copy className="mr-2 h-4 w-4" /> Duplicate
-            </Button>
-            <Button variant="outline" className="hidden sm:inline-flex">
-              <Share2 className="mr-2 h-4 w-4" /> Share
-            </Button>
-            <Button
-              onClick={doSave}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              Save
-            </Button>
+                <Link
+                  href={`/diary/${id}/label`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Tag className="mr-2 h-4 w-4" /> Label
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                className="hidden sm:inline-flex"
+                onClick={async () => {
+                  const res = await fetch(`/api/diaries/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      archivedAt: new Date().toISOString().split("T")[0],
+                    }),
+                  });
+                  if (res.ok) {
+                    toast({
+                      title: "Diary archived",
+                      description: "Redirecting to archives...",
+                    });
+                    setTimeout(() => router.push("/archives"), 1000);
+                  } else {
+                    toast({ title: "Archive failed", variant: "destructive" });
+                  }
+                }}
+              >
+                <Archive className="mr-2 h-4 w-4" /> Archive
+              </Button>
+              <Button
+                onClick={doSave}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                Save
+              </Button>
+            </div>
           </div>
-        </div>
-        <Separator />
-      </div>
+          <Separator className="my-2" />
+        </CardContent>
+      </Card>
 
       {/* Tabs */}
       <Tabs defaultValue="summary" className="mt-4">
@@ -424,7 +561,9 @@ export default function DiaryDetail({ id }: { id: string }) {
                   Store location
                 </Label>
                 <Input
-                  placeholder="e.g. Christchurch / Riccarton" /* UI only for now */
+                  value={form.storeLocation || ""}
+                  onChange={(e) => set("storeLocation", e.target.value)}
+                  placeholder="e.g. Christchurch / Riccarton"
                 />
               </div>
               <div>
@@ -435,14 +574,38 @@ export default function DiaryDetail({ id }: { id: string }) {
                 <Label className="text-sm font-semibold pb-2">
                   Assigned to
                 </Label>
-                <Input placeholder="Multiple allowed (UI only)" />
+                <Select
+                  value={form.assignedTo || "none"}
+                  disabled={isLoadingStaff}
+                  onValueChange={(value) => {
+                    set("assignedTo", value === "none" ? null : value);
+                  }}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue
+                      placeholder={
+                        isLoadingStaff
+                          ? "Loading staff..."
+                          : "Select staff member"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No staff assigned</SelectItem>
+                    {staffMembers.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.staffCode} - {member.fullName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="md:col-span-3">
                 <Label className="text-sm font-semibold pb-2">Tags</Label>
                 <Input
-                  value={tags}
-                  onChange={(e) => setTags(e.target.value)}
+                  value={form.tags || ""}
+                  onChange={(e) => set("tags", e.target.value)}
                   placeholder="urgent, warranty"
                 />
               </div>
@@ -489,12 +652,16 @@ export default function DiaryDetail({ id }: { id: string }) {
                 Add the payment details for the customer.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid md:grid-cols-4 gap-4">
+            <CardContent className="space-y-4">
+              {/* Payment method on its own row */}
               <div>
                 <Label className="text-sm font-semibold pb-2">
                   Payment method
                 </Label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <Select
+                  value={form.paymentMethod}
+                  onValueChange={(value) => set("paymentMethod", value)}
+                >
                   <SelectTrigger className="h-10">
                     <SelectValue placeholder="Select method" />
                   </SelectTrigger>
@@ -505,39 +672,56 @@ export default function DiaryDetail({ id }: { id: string }) {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label className="text-sm font-semibold pb-2">
-                  Amount paid
-                </Label>
-                <Input
-                  type="number"
-                  placeholder="0.00"
-                  inputMode="decimal"
-                  value={amountPaid}
-                  onChange={(e) => setAmountPaid(e.target.value)}
-                />
+
+              {/* Other payment fields in a grid */}
+              <div className="grid md:grid-cols-4 gap-4">
+                <div>
+                  <Label className="text-sm font-semibold pb-2">
+                    Amount paid
+                  </Label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    inputMode="decimal"
+                    value={form.amountPaid}
+                    onChange={(e) => set("amountPaid", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold pb-2">
+                    Invoice / PO
+                  </Label>
+                  <Input
+                    placeholder="e.g. 02600........"
+                    value={form.invoicePO}
+                    onChange={(e) => set("invoicePO", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold pb-2">Paid at</Label>
+                  <Input
+                    type="date"
+                    value={form.paidAt ?? ""}
+                    onChange={(e) => set("paidAt", e.target.value || null)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold pb-2">
+                    Total amount
+                  </Label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    inputMode="decimal"
+                    value={form.total}
+                    onChange={(e) => set("total", e.target.value)}
+                  />
+                </div>
               </div>
-              <div>
-                <Label className="text-sm font-semibold pb-2">
-                  Invoice / PO
-                </Label>
-                <Input
-                  placeholder="e.g. 02600........"
-                  value={invoicePO}
-                  onChange={(e) => setInvoicePO(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-semibold pb-2">Paid at</Label>
-                <Input
-                  type="date"
-                  value={paidAt}
-                  onChange={(e) => setPaidAt(e.target.value)}
-                />
-              </div>
-              <div className="md:col-span-4 text-right text-sm text-muted-foreground">
-                Subtotal ${totals.subtotal} • GST ${totals.tax} • Total $
-                {totals.total} •{" "}
+
+              {/* Summary line */}
+              <div className="text-right text-sm text-muted-foreground">
+                Subtotal ${totals.subtotal} • Total ${totals.total} •{" "}
                 <span className="font-medium">Balance ${totals.balance}</span>
               </div>
             </CardContent>
@@ -567,34 +751,36 @@ export default function DiaryDetail({ id }: { id: string }) {
 
         {/* FILES */}
         <TabsContent value="files">
-          <Attachments diaryId={id} initial={data.files || []} />
+          <Attachments diaryId={id} initial={data?.attachments || []} />
         </TabsContent>
       </Tabs>
 
       {/* Sticky bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-10 bg-background/80 backdrop-blur border-t px-6 py-3 flex items-center justify-between">
-        <div className="text-xs text-muted-foreground flex items-center gap-2">
-          {dirty ? (
-            <>
-              <AlertCircle className="h-4 w-4 text-amber-600" />
-              You have unsaved changes.
-            </>
-          ) : (
-            <>All changes saved.</>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={backClicked}>
-            Back
-          </Button>
-          <Button
-            onClick={doSave}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            Save
-          </Button>
-        </div>
-      </div>
+      <Card className="mt-6">
+        <CardContent className="px-6 py-3 flex items-center justify-between">
+          <div className="text-xs text-muted-foreground flex items-center gap-2">
+            {dirty ? (
+              <>
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                You have unsaved changes.
+              </>
+            ) : (
+              <>All changes saved.</>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={backClicked}>
+              Back
+            </Button>
+            <Button
+              onClick={doSave}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              Save
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Leave without saving? */}
       <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>

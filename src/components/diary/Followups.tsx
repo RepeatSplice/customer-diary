@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageSquareText,
@@ -12,6 +12,7 @@ import {
   Trash2,
   Check,
   X,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,7 +24,6 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import {
   Card,
@@ -42,6 +42,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const iconFor = (type: string) => {
   switch (type) {
@@ -54,6 +62,13 @@ const iconFor = (type: string) => {
     default:
       return <MessageSquareText className="h-4 w-4" />;
   }
+};
+
+type StaffMember = {
+  id: string;
+  fullName: string;
+  staffCode: string;
+  role: "staff" | "manager";
 };
 
 type Follow = {
@@ -79,11 +94,15 @@ export function Followups({
   );
   const [pinned, setPinned] = useState<Set<string>>(new Set());
 
+  // Staff data
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(true);
+
   // compose state (right column)
   const [text, setText] = useState("");
   const [type, setType] = useState<Follow["entryType"]>("note");
-  const [staff, setStaff] = useState<string>(""); // wire later
-  const [nextAction, setNextAction] = useState<string>("");
+  const [staff, setStaff] = useState<string>("none");
+  const [nextAction, setNextAction] = useState<Date | undefined>(undefined);
 
   // edit state (inline per-item)
   const [editing, setEditing] = useState<{
@@ -95,6 +114,27 @@ export function Followups({
 
   // delete confirm
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Fetch staff members on component mount
+  useEffect(() => {
+    async function fetchStaff() {
+      try {
+        const res = await fetch("/api/staff-users?public=true");
+        if (res.ok) {
+          const data = await res.json();
+          setStaffMembers(data.items || []);
+        } else {
+          console.error("Failed to fetch staff members");
+        }
+      } catch (error) {
+        console.error("Error fetching staff:", error);
+      } finally {
+        setIsLoadingStaff(false);
+      }
+    }
+
+    fetchStaff();
+  }, []);
 
   const ordered = useMemo(() => {
     const pinnedArr = items.filter((i) => pinned.has(i.id));
@@ -111,7 +151,7 @@ export function Followups({
       body: JSON.stringify({
         entryType: type,
         message: text.trim(),
-        staffCode: staff || undefined,
+        staffCode: staff === "none" ? undefined : staff,
       }),
     });
     if (res.ok) {
@@ -123,8 +163,9 @@ export function Followups({
         )
       );
       setText("");
-      setNextAction("");
+      setNextAction(undefined);
       setType("note");
+      setStaff("none");
       // rule: if SMS, flip Texted flag
       if (type === "sms") {
         await fetch(`/api/diaries/${diaryId}`, {
@@ -323,15 +364,38 @@ export function Followups({
                     </div>
                     <div>
                       <Label className="text-xs">Staff</Label>
-                      <Input
-                        className="h-9 text-xs"
-                        value={editing?.staffCode ?? ""}
-                        onChange={(e) =>
-                          setEditing((s) =>
-                            s ? { ...s, staffCode: e.target.value } : s
+                      <Select
+                        value={editing?.staffCode ?? "none"}
+                        onValueChange={(value) =>
+                          setEditing((e) =>
+                            e
+                              ? {
+                                  ...e,
+                                  staffCode:
+                                    value === "none" ? undefined : value,
+                                }
+                              : e
                           )
                         }
-                      />
+                        disabled={isLoadingStaff}
+                      >
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue placeholder="Select staff" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">
+                            No staff assigned
+                          </SelectItem>
+                          {staffMembers.map((member) => (
+                            <SelectItem
+                              key={member.id}
+                              value={member.staffCode}
+                            >
+                              {member.staffCode} - {member.fullName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -403,11 +467,29 @@ export function Followups({
             </div>
             <div className="col-span-2">
               <Label className="text-sm font-semibold pb-2">Staff</Label>
-              <Input
-                placeholder="Select staff (UI only now)"
+              <Select
                 value={staff}
-                onChange={(e) => setStaff(e.target.value)}
-              />
+                onValueChange={setStaff}
+                disabled={isLoadingStaff}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue
+                    placeholder={
+                      isLoadingStaff
+                        ? "Loading staff..."
+                        : "Select staff member"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No staff assigned</SelectItem>
+                  {staffMembers.map((member) => (
+                    <SelectItem key={member.id} value={member.staffCode}>
+                      {member.staffCode} - {member.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -424,11 +506,32 @@ export function Followups({
             <Label className="text-sm font-semibold pb-2">
               Next action / due date
             </Label>
-            <Input
-              placeholder="UI only for now"
-              value={nextAction}
-              onChange={(e) => setNextAction(e.target.value)}
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !nextAction && "text-muted-foreground"
+                  )}
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {nextAction ? (
+                    format(nextAction, "PPP")
+                  ) : (
+                    <span>Pick a date</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <CalendarComponent
+                  mode="single"
+                  selected={nextAction}
+                  onSelect={setNextAction}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="flex justify-end">
             <Button

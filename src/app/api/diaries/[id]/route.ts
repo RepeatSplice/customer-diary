@@ -33,8 +33,15 @@ export async function GET(
         dueDate: schema.customerDiary.dueDate,
         lastViewedAt: schema.customerDiary.lastViewedAt,
         archivedAt: schema.customerDiary.archivedAt,
+        // Payment fields
+        paymentMethod: schema.customerDiary.paymentMethod,
+        amountPaid: schema.customerDiary.amountPaid,
+        invoicePO: schema.customerDiary.invoicePO,
+        paidAt: schema.customerDiary.paidAt,
+        // Additional fields
+        storeLocation: schema.customerDiary.storeLocation,
+        tags: schema.customerDiary.tags,
         subtotal: schema.customerDiary.subtotal,
-        tax: schema.customerDiary.tax,
         total: schema.customerDiary.total,
         createdAt: schema.customerDiary.createdAt,
         updatedAt: schema.customerDiary.updatedAt,
@@ -144,6 +151,16 @@ export async function PATCH(
   const session = await requireSession();
 
   const body = diaryPatchSchema.parse(await req.json());
+
+  // Debug logging for archivedAt
+  if (body.archivedAt !== undefined) {
+    console.log(
+      `PATCH ${id} - archivedAt:`,
+      body.archivedAt,
+      typeof body.archivedAt
+    );
+  }
+
   if (
     body.status === "Collected" &&
     body.isPaid === false &&
@@ -163,11 +180,96 @@ export async function PATCH(
       isPaid: body.isPaid,
       isOrdered: body.isOrdered,
       hasTextedCustomer: body.hasTextedCustomer,
+      whatTheyWant: body.whatTheyWant,
       adminNotes: body.adminNotes,
+      dueDate: body.dueDate,
       assignedTo: body.assignedTo,
+      // Payment fields
+      paymentMethod: body.paymentMethod,
+      amountPaid: body.amountPaid ? String(body.amountPaid) : undefined,
+      invoicePO: body.invoicePO,
+      paidAt: body.paidAt,
+      // Additional fields
+      storeLocation: body.storeLocation,
+      tags: body.tags,
+      // Total amount
+      total: body.total ? String(body.total) : undefined,
+      // Archive field
+      archivedAt:
+        body.archivedAt === null
+          ? null
+          : body.archivedAt === ""
+          ? null
+          : body.archivedAt
+          ? new Date(body.archivedAt)
+          : undefined,
+      updatedAt: new Date(),
     })
     .where(eq(schema.customerDiary.id, id))
     .returning();
 
   return NextResponse.json(row);
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  await requireSession();
+
+  try {
+    // Check if diary exists and get its current status
+    const [diary] = await db
+      .select({
+        id: schema.customerDiary.id,
+        status: schema.customerDiary.status,
+        archivedAt: schema.customerDiary.archivedAt,
+      })
+      .from(schema.customerDiary)
+      .where(eq(schema.customerDiary.id, id));
+
+    if (!diary) {
+      return NextResponse.json({ error: "Diary not found" }, { status: 404 });
+    }
+
+    // For safety, only allow deletion of archived diaries
+    if (!diary.archivedAt) {
+      return NextResponse.json(
+        { error: "Cannot delete non-archived diary. Please archive it first." },
+        { status: 400 }
+      );
+    }
+
+    // Delete the diary and all related data
+    await db.transaction(async (tx) => {
+      // Delete products
+      await tx
+        .delete(schema.diaryProducts)
+        .where(eq(schema.diaryProducts.diaryId, id));
+
+      // Delete followups
+      await tx
+        .delete(schema.diaryFollowups)
+        .where(eq(schema.diaryFollowups.diaryId, id));
+
+      // Delete attachments
+      await tx
+        .delete(schema.attachments)
+        .where(eq(schema.attachments.diaryId, id));
+
+      // Finally delete the main diary record
+      await tx
+        .delete(schema.customerDiary)
+        .where(eq(schema.customerDiary.id, id));
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error("Error deleting diary:", e);
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : String(e) },
+      { status: 500 }
+    );
+  }
 }

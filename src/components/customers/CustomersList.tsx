@@ -34,6 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { toast } from "@/components/ui/use-toast";
 
 // ---------------- Types ----------------
 interface CustomerRow {
@@ -232,9 +233,51 @@ export default function CustomersList() {
   ]);
 
   async function deleteCustomer(id: string) {
-    const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      setRows((prev) => (prev ? prev.filter((x) => x.id !== id) : prev));
+    try {
+      const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
+
+      if (res.ok) {
+        // Successfully deleted
+        setRows((prev) => (prev ? prev.filter((x) => x.id !== id) : prev));
+        setError(null); // Clear any previous errors
+        toast({
+          title: "Customer deleted",
+          description: "Customer has been successfully removed.",
+        });
+      } else if (res.status === 409) {
+        // Customer has active diaries
+        const errorData = await res.json();
+        const errorMessage =
+          errorData.error ||
+          "This customer has active diaries. Please close or cancel all diaries before deleting the customer.";
+        setError(errorMessage);
+        toast({
+          title: "Cannot delete customer",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } else {
+        // Other error
+        const errorData = await res.json();
+        const errorMessage =
+          errorData.error || "Failed to delete customer. Please try again.";
+        setError(errorMessage);
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      const errorMessage =
+        "Network error. Please check your connection and try again.";
+      setError(errorMessage);
+      toast({
+        title: "Network Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
     }
   }
 
@@ -246,7 +289,31 @@ export default function CustomersList() {
 
       {error && (
         <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800">
-          {error}
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="font-medium mb-2">Cannot Delete Customer</div>
+              <div className="text-sm">{error}</div>
+              {error.includes("active diaries") && (
+                <div className="mt-3 text-sm">
+                  <div className="font-medium mb-1">To resolve this:</div>
+                  <ul className="list-disc list-inside space-y-1 text-xs">
+                    <li>Go to the customers active diaries</li>
+                    <li>Change their status to Collected or Cancelled</li>
+                    <li>Or archive the diaries if you want to keep them</li>
+                    <li>Then try deleting the customer again</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setError(null)}
+              className="text-red-600 hover:text-red-800 hover:bg-red-100"
+            >
+              ✕
+            </Button>
+          </div>
         </div>
       )}
 

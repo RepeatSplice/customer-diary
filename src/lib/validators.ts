@@ -37,6 +37,36 @@ export const diaryCreateSchema = z.object({
   hasTextedCustomer: z.boolean().optional().default(false),
   products: z.array(productLineSchema).default([]),
   adminNotes: z.string().optional(),
+  // Payment fields
+  paymentMethod: z.string().optional(),
+  amountPaid: z
+    .union([
+      z
+        .string()
+        .transform((v) => (v === "" ? undefined : parseFloat(v) || undefined)),
+      z.number().min(0),
+    ])
+    .optional(),
+  invoicePO: z.string().optional(),
+  paidAt: z
+    .string()
+    .date()
+    .optional()
+    .or(z.literal(""))
+    .or(z.null())
+    .transform((v) => (v === "" ? null : v)),
+  // Additional fields
+  storeLocation: z.string().optional(),
+  tags: z.string().optional(),
+  // Total amount
+  total: z
+    .union([
+      z
+        .string()
+        .transform((v) => (v === "" ? undefined : parseFloat(v) || undefined)),
+      z.number().min(0),
+    ])
+    .optional(),
 });
 
 export const diaryPatchSchema = z.object({
@@ -47,8 +77,54 @@ export const diaryPatchSchema = z.object({
   isPaid: z.boolean().optional(),
   isOrdered: z.boolean().optional(),
   hasTextedCustomer: z.boolean().optional(),
+  whatTheyWant: z.string().optional(),
   adminNotes: z.string().optional(),
+  dueDate: z
+    .string()
+    .date()
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => v || undefined),
   assignedTo: z.string().uuid().optional(),
+  // Payment fields
+  paymentMethod: z.string().optional(),
+  amountPaid: z
+    .union([
+      z
+        .string()
+        .transform((v) => (v === "" ? undefined : parseFloat(v) || undefined)),
+      z.number().min(0),
+    ])
+    .optional(),
+  invoicePO: z.string().optional(),
+  paidAt: z
+    .string()
+    .date()
+    .optional()
+    .or(z.literal(""))
+    .or(z.null())
+    .transform((v) => (v === "" ? null : v)),
+  // Additional fields
+  storeLocation: z.string().optional(),
+  tags: z.string().optional(),
+  // Total amount
+  total: z
+    .union([
+      z
+        .string()
+        .transform((v) => (v === "" ? undefined : parseFloat(v) || undefined)),
+      z.number().min(0),
+    ])
+    .optional(),
+  // Archive field
+  archivedAt: z
+    .string()
+    .date()
+    .optional()
+    .or(z.literal(""))
+    .or(z.null())
+    .transform((v) => (v === "" ? null : v))
+    .nullable(),
 });
 
 export const followupCreateSchema = z.object({

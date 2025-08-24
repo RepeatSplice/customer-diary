@@ -9,7 +9,9 @@ const globalForDb = globalThis as unknown as {
 const client =
   globalForDb.__pg ??
   postgres(process.env.DATABASE_URL!, {
-    ssl: "require", // TLS for Supabase
+    ssl: {
+      rejectUnauthorized: false, // Allow self-signed certificates
+    },
     prepare: false, // per Supabase doc for pooler
     max: 10,
   });

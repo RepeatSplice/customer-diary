@@ -16,9 +16,9 @@ async function assertManager() {
 
 // GET: list staff users with search and pagination
 export async function GET(req: NextRequest) {
-  const session = await assertManager();
+  const session = await requireSession().catch(() => null);
   if (!session) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { searchParams } = new URL(req.url);
@@ -26,6 +26,35 @@ export async function GET(req: NextRequest) {
   const role = searchParams.get("role") || "all";
   const limit = Number(searchParams.get("limit") || 25);
   const offset = Number(searchParams.get("offset") || 0);
+  const isPublic = searchParams.get("public") === "true";
+
+  // For public endpoint, allow any authenticated user to get basic staff info
+  if (isPublic) {
+    try {
+      const items = await db
+        .select({
+          id: schema.staffUsers.id,
+          fullName: schema.staffUsers.fullName,
+          staffCode: schema.staffUsers.staffCode,
+          role: schema.staffUsers.role,
+        })
+        .from(schema.staffUsers)
+        .orderBy(schema.staffUsers.fullName);
+
+      return NextResponse.json({ items });
+    } catch (error) {
+      console.error("Error fetching public staff list:", error);
+      return NextResponse.json(
+        { error: "Failed to fetch staff list" },
+        { status: 500 }
+      );
+    }
+  }
+
+  // For admin endpoints, require manager role
+  if (session.user.role !== "manager") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   try {
     // Build where clause

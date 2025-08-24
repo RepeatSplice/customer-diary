@@ -5,7 +5,7 @@ import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { format } from "date-fns";
-import { Search, Filter, Trash2, Archive } from "lucide-react";
+import { Search, Filter, Archive } from "lucide-react";
 
 // shadcn/ui
 import {
@@ -39,8 +39,8 @@ import { PriorityBadge } from "@/components/PriorityBadge";
 export type Status =
   | "Pending"
   | "Ordered"
-  | "Ready for Pickup"
-  | "Completed"
+  | "ReadyForPickup"
+  | "Collected"
   | "Cancelled";
 export type Priority = "Low" | "Normal" | "High" | "Urgent";
 
@@ -109,8 +109,8 @@ const fadeIn = {
 const STATUS_OPTIONS: Status[] = [
   "Pending",
   "Ordered",
-  "Ready for Pickup",
-  "Completed",
+  "ReadyForPickup",
+  "Collected",
   "Cancelled",
 ];
 const PRIORITY_OPTIONS: Priority[] = ["Low", "Normal", "High", "Urgent"];
@@ -133,37 +133,49 @@ export default function DashboardPage() {
 
   const debouncedSearch = useDebounced(search, 250);
 
-  React.useEffect(() => {
-    let cancelled = false;
+  const fetchDiaries = React.useCallback(async () => {
     setLoading(true);
-    fetch("/api/diaries?limit=200")
-      .then(async (r) => {
-        if (!r.ok) throw new Error(await r.text());
-        return r.json();
-      })
-      .then((data: DiaryApiResponse[]) => {
-        if (cancelled) return;
-        const mapped: DiaryRow[] = data.map((d: DiaryApiResponse) => ({
-          id: d.id,
-          whatTheyWant: d.whatTheyWant ?? null,
-          status: (d.status ?? "Pending") as Status,
-          priority: (d.priority ?? "Normal") as Priority,
-          total: d.total ?? d.subtotal ?? 0,
-          createdAt: d.createdAt,
-          dueDate: d.dueDate ?? null,
-          isPaid: d.isPaid ?? null,
-          staff: d.createdByCode ?? d.createdBy ?? null,
-          customer: d.customer ?? null,
-          tags: d.tags ?? null,
-        }));
-        setRows(mapped);
-      })
-      .catch((e) => console.error("Failed to fetch diaries:", e))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const res = await fetch("/api/diaries?archived=0&limit=200");
+      if (!res.ok) throw new Error(await res.text());
+      const data: DiaryApiResponse[] = await res.json();
+      const mapped: DiaryRow[] = data.map((d: DiaryApiResponse) => ({
+        id: d.id,
+        whatTheyWant: d.whatTheyWant ?? null,
+        status: (d.status ?? "Pending") as Status,
+        priority: (d.priority ?? "Normal") as Priority,
+        total: d.total ?? d.subtotal ?? 0,
+        createdAt: d.createdAt,
+        dueDate: d.dueDate ?? null,
+        isPaid: d.isPaid ?? null,
+        staff: d.createdByCode ?? d.createdBy ?? null,
+        customer: d.customer ?? null,
+        tags: d.tags ?? null,
+      }));
+      setRows(mapped);
+    } catch (e) {
+      console.error("Failed to fetch diaries:", e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  React.useEffect(() => {
+    fetchDiaries();
+  }, [fetchDiaries]);
+
+  // Refresh when page becomes visible (e.g., user returns from archives)
+  React.useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchDiaries();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [fetchDiaries]);
 
   const staffOptions = React.useMemo(() => {
     const s = new Set<string>();
@@ -175,17 +187,17 @@ export default function DashboardPage() {
     const all = rows ?? [];
     const now = new Date();
     const active = all.filter(
-      (r) => !["Completed", "Cancelled"].includes(r.status)
+      (r) => !["Collected", "Cancelled"].includes(r.status)
     ).length;
     const overdue = all.filter((r) => {
       if (!r.dueDate) return false;
       return (
         new Date(r.dueDate) < now &&
-        !["Completed", "Cancelled"].includes(r.status)
+        !["Collected", "Cancelled"].includes(r.status)
       );
     }).length;
     const last30 = all.filter((r) => {
-      if (r.status !== "Completed") return false;
+      if (r.status !== "Collected") return false;
       const created = new Date(r.createdAt);
       const days = (Date.now() - created.getTime()) / (1000 * 60 * 60 * 24);
       return days <= 30;
@@ -220,7 +232,7 @@ export default function DashboardPage() {
         overdueOnly
           ? r.dueDate
             ? new Date(r.dueDate) < new Date() &&
-              !["Completed", "Cancelled"].includes(r.status)
+              !["Collected", "Cancelled"].includes(r.status)
             : false
           : true
       )
@@ -268,7 +280,7 @@ export default function DashboardPage() {
       setOverdueOnly(true);
       setStatus("all");
     } else if (key === "completed30") {
-      setStatus("Completed");
+      setStatus("Collected");
       setOverdueOnly(false);
     }
   };
@@ -276,8 +288,11 @@ export default function DashboardPage() {
   return (
     <div className="w-full px-6 pb-12">
       {/* Header */}
-      <div className="mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <Button onClick={fetchDiaries} variant="outline" size="sm">
+          Refresh
+        </Button>
       </div>
 
       {/* Stat cards */}
@@ -324,7 +339,7 @@ export default function DashboardPage() {
           <Card className="rounded-2xl border shadow-sm">
             <CardContent className="p-5">
               <div className="text-sm text-muted-foreground">
-                Completed (30d)
+                Collected (30d)
               </div>
               <div className="mt-1 flex items-baseline gap-2">
                 <div className="text-3xl font-semibold">{stats.last30}</div>
@@ -570,15 +585,27 @@ export default function DashboardPage() {
                             View
                           </Button>
                         </Link>
-                        <Button variant="outline" size="sm" className="gap-1">
-                          <Archive className="h-4 w-4" />
-                        </Button>
                         <Button
-                          variant="destructive"
+                          variant="outline"
                           size="sm"
                           className="gap-1"
+                          onClick={async () => {
+                            const res = await fetch(`/api/diaries/${d.id}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                archivedAt: new Date()
+                                  .toISOString()
+                                  .split("T")[0],
+                              }),
+                            });
+                            if (res.ok) {
+                              // Refresh the dashboard to remove the archived diary
+                              fetchDiaries();
+                            }
+                          }}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Archive className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>

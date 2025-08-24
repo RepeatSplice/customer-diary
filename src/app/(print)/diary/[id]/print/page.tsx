@@ -25,7 +25,6 @@ export default async function PrintDiary({
       isPaid: schema.customerDiary.isPaid,
       isOrdered: schema.customerDiary.isOrdered,
       subtotal: schema.customerDiary.subtotal,
-      tax: schema.customerDiary.tax,
       total: schema.customerDiary.total,
       createdAt: schema.customerDiary.createdAt,
 
@@ -196,12 +195,6 @@ export default async function PrintDiary({
                 Subtotal
               </td>
               <td>{base.subtotal}</td>
-            </tr>
-            <tr>
-              <td colSpan={4} style={{ textAlign: "right" }}>
-                GST (15%)
-              </td>
-              <td>{base.tax}</td>
             </tr>
             <tr>
               <td colSpan={4} style={{ textAlign: "right" }}>

@@ -1,11 +1,17 @@
 // src/components/forms/NewDiaryForm.tsx
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, {
+  useState,
+  useMemo,
+  useRef,
+  useEffect,
+  useCallback,
+} from "react";
 import { format } from "date-fns";
-import { UploadCloud, X, Trash } from "lucide-react";
-import { FileText } from "lucide-react";
+import { Trash, FileText, Upload, X } from "lucide-react";
+import Image from "next/image";
+import { motion } from "framer-motion";
 
 // shadcn/ui
 import {
@@ -72,7 +78,7 @@ interface FlagsState {
   invoiceOrPO: string;
 }
 
-function DraftAttachments({
+const DraftAttachments = React.memo(function DraftAttachments({
   value,
   onChange,
 }: {
@@ -82,11 +88,43 @@ function DraftAttachments({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  const addFiles = (list: FileList | null) => {
-    if (!list?.length) return;
-    onChange([...value, ...Array.from(list)]);
-    if (inputRef.current) inputRef.current.value = "";
-  };
+  const addFiles = useCallback(
+    (list: FileList | null) => {
+      if (!list?.length) return;
+      onChange([...value, ...Array.from(list)]);
+      if (inputRef.current) inputRef.current.value = "";
+    },
+    [value, onChange]
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragActive(false);
+      addFiles(e.dataTransfer.files);
+    },
+    [addFiles]
+  );
+
+  const handleClick = useCallback(() => {
+    inputRef.current?.click();
+  }, []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      inputRef.current?.click();
+    }
+  }, []);
 
   return (
     <>
@@ -101,23 +139,11 @@ function DraftAttachments({
       <div
         role="button"
         tabIndex={0}
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragActive(true);
-        }}
-        onDragLeave={(e) => {
-          e.preventDefault();
-          setDragActive(false);
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragActive(false);
-          addFiles(e.dataTransfer.files);
-        }}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         className={cn(
           "rounded-2xl border-2 border-dashed p-6 sm:p-8",
           "border-emerald-300/60 bg-emerald-50/40",
@@ -125,16 +151,16 @@ function DraftAttachments({
         )}
       >
         <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
-          <UploadCloud className="h-8 w-8" />
+          <Upload className="h-8 w-8" />
           <p className="text-sm">Select files to upload</p>
           <p className="text-xs">Images / PDF — or drop here</p>
         </div>
       </div>
     </>
   );
-}
+});
 
-function DraftPreviewGrid({
+const DraftPreviewGrid = React.memo(function DraftPreviewGrid({
   files,
   onRemove,
 }: {
@@ -144,13 +170,58 @@ function DraftPreviewGrid({
   // create object URLs for image previews
   const [urls, setUrls] = useState<string[]>([]);
   const [hovering, setHovering] = useState<number | null>(null);
+
+  const handleRemove = useCallback(
+    (index: number) => {
+      onRemove(index);
+    },
+    [onRemove]
+  );
+
+  const setHoveringIndex = useCallback((index: number | null) => {
+    setHovering(index);
+  }, []);
+
   useEffect(() => {
-    const next = files.map((f) => URL.createObjectURL(f));
+    if (!files.length) {
+      setUrls([]);
+      return;
+    }
+
+    const next = files
+      .map((f) => {
+        try {
+          return URL.createObjectURL(f);
+        } catch {
+          console.warn("Failed to create object URL for file:", f.name);
+          return "";
+        }
+      })
+      .filter((url) => url !== "");
+
     setUrls(next);
-    return () => next.forEach((u) => URL.revokeObjectURL(u));
+
+    return () => {
+      next.forEach((u) => {
+        try {
+          URL.revokeObjectURL(u);
+        } catch {
+          // Ignore errors when revoking URLs
+        }
+      });
+    };
   }, [files]);
 
   if (!files.length) return null;
+
+  // Don't render until we have URLs for all files
+  if (urls.length !== files.length) {
+    return (
+      <div className="mt-3 p-4 text-center text-muted-foreground">
+        <div className="animate-pulse">Loading previews...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
@@ -163,9 +234,9 @@ function DraftPreviewGrid({
           <button
             type="button"
             aria-label="Remove attachment"
-            onMouseEnter={() => setHovering(i)}
-            onMouseLeave={() => setHovering(null)}
-            onClick={() => onRemove(i)}
+            onMouseEnter={() => setHoveringIndex(i)}
+            onMouseLeave={() => setHoveringIndex(null)}
+            onClick={() => handleRemove(i)}
             className="absolute left-2 top-2 z-10 inline-flex items-center justify-center
                        h-7 w-7 rounded-full bg-white/95 border text-slate-700
                         focus:outline-none transition-colors hover:bg-red-500 hover:text-white"
@@ -178,13 +249,18 @@ function DraftPreviewGrid({
           </button>
 
           {/* Preview */}
-          {f.type.startsWith("image/") ? (
-            <img
+          {f.type.startsWith("image/") && urls[i] ? (
+            <Image
               src={urls[i]}
               alt={f.name}
+              width={160}
+              height={160}
               className="h-40 w-full object-cover"
-              loading="lazy"
             />
+          ) : f.type.startsWith("image/") ? (
+            <div className="h-40 w-full flex items-center justify-center text-muted-foreground">
+              <div className="animate-pulse">Loading...</div>
+            </div>
           ) : (
             <div className="h-40 w-full flex items-center justify-center text-muted-foreground">
               <FileText className="h-8 w-8" />
@@ -197,7 +273,7 @@ function DraftPreviewGrid({
       ))}
     </div>
   );
-}
+});
 
 export default function NewDiaryForm() {
   // core state (API contract preserved)
@@ -208,6 +284,7 @@ export default function NewDiaryForm() {
     accountNo: "",
     preferredContact: "",
   });
+
   const [draftFiles, setDraftFiles] = useState<File[]>([]);
   const [what, setWhat] = useState("");
   const [priority, setPriority] = useState<
@@ -239,6 +316,26 @@ export default function NewDiaryForm() {
   // products + notes
   const [products, setProducts] = useState<any[]>([]);
   const [adminNotes, setAdminNotes] = useState("");
+
+  // Optimized handlers with useCallback
+  const updateCustomer = useCallback((field: keyof Customer, value: string) => {
+    setCustomer((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const updateFlags = useCallback((field: keyof FlagsState, value: any) => {
+    setFlags((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleProductsChange = useCallback((newProducts: any[]) => {
+    setProducts(newProducts);
+  }, []);
+
+  const handleAdminNotesChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setAdminNotes(e.target.value);
+    },
+    []
+  );
 
   // total (tolerant to shapes used in ProductEditor)
   const total = useMemo(() => {
@@ -420,38 +517,34 @@ export default function NewDiaryForm() {
               <div>
                 <Label className="text-sm font-semibold pb-2">Name</Label>
                 <Input
+                  placeholder="John Doe"
                   value={customer.name}
-                  onChange={(e) =>
-                    setCustomer({ ...customer, name: e.target.value })
-                  }
+                  onChange={(e) => updateCustomer("name", e.target.value)}
                 />
               </div>
               <div>
                 <Label className="text-sm font-semibold pb-2">Email</Label>
                 <Input
                   type="email"
+                  placeholder="john@example.com"
                   value={customer.email}
-                  onChange={(e) =>
-                    setCustomer({ ...customer, email: e.target.value })
-                  }
+                  onChange={(e) => updateCustomer("email", e.target.value)}
                 />
               </div>
               <div>
                 <Label className="text-sm font-semibold pb-2">Phone</Label>
                 <Input
                   value={customer.phone}
-                  onChange={(e) =>
-                    setCustomer({ ...customer, phone: e.target.value })
-                  }
+                  placeholder="021......."
+                  onChange={(e) => updateCustomer("phone", e.target.value)}
                 />
               </div>
               <div>
                 <Label className="text-sm font-semibold pb-2">Account #</Label>
                 <Input
                   value={customer.accountNo}
-                  onChange={(e) =>
-                    setCustomer({ ...customer, accountNo: e.target.value })
-                  }
+                  placeholder="A12..."
+                  onChange={(e) => updateCustomer("accountNo", e.target.value)}
                 />
               </div>
               <div className="lg:col-span-2">
@@ -585,41 +678,33 @@ export default function NewDiaryForm() {
               </CardDescription>
             </CardHeader>
             <CardContent className="grid lg:grid-cols-3 gap-4">
-              <div className="flex items-center justify-between rounded-xl border p-3">
-                <div className="space-y-0.5">
-                  <div className="text-sm font-medium">Paid</div>
-                  <div className="text-xs text-muted-foreground">
-                    Mark when payment received
-                  </div>
-                </div>
+              <div className="flex items-center space-x-2">
                 <Switch
+                  id="isPaid"
                   checked={flags.isPaid}
-                  onCheckedChange={(v) => setFlags({ ...flags, isPaid: v })}
+                  onCheckedChange={(checked) => updateFlags("isPaid", checked)}
                 />
+                <Label htmlFor="isPaid">Paid</Label>
               </div>
-              <div className="flex items-center justify-between rounded-xl border p-3">
-                <div className="space-y-0.5">
-                  <div className="text-sm font-medium">Ordered</div>
-                  <div className="text-xs text-muted-foreground">
-                    Supplier order placed
-                  </div>
-                </div>
+              <div className="flex items-center space-x-2">
                 <Switch
+                  id="isOrdered"
                   checked={flags.isOrdered}
-                  onCheckedChange={(v) => setFlags({ ...flags, isOrdered: v })}
-                />
-              </div>
-              <div className="flex items-center justify-between rounded-xl border p-3">
-                <div className="space-y-0.5">
-                  <div className="text-sm font-medium">Texted customer</div>
-                  <div className="text-xs text-muted-foreground">SMS sent</div>
-                </div>
-                <Switch
-                  checked={flags.hasTextedCustomer}
-                  onCheckedChange={(v) =>
-                    setFlags({ ...flags, hasTextedCustomer: v })
+                  onCheckedChange={(checked) =>
+                    updateFlags("isOrdered", checked)
                   }
                 />
+                <Label htmlFor="isOrdered">Ordered</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="hasTextedCustomer"
+                  checked={flags.hasTextedCustomer}
+                  onCheckedChange={(checked) =>
+                    updateFlags("hasTextedCustomer", checked)
+                  }
+                />
+                <Label htmlFor="hasTextedCustomer">Texted Customer</Label>
               </div>
 
               <div>
@@ -713,7 +798,7 @@ export default function NewDiaryForm() {
 
         {/* Products */}
         <motion.section variants={section} custom={6}>
-          <ProductEditor value={products} onChange={setProducts} />
+          <ProductEditor value={products} onChange={handleProductsChange} />
         </motion.section>
 
         {/* Notes */}
@@ -732,7 +817,7 @@ export default function NewDiaryForm() {
                 placeholder="Would like to have a look at the product first..."
                 rows={4}
                 value={adminNotes}
-                onChange={(e) => setAdminNotes(e.target.value)}
+                onChange={handleAdminNotesChange}
               />
             </CardContent>
           </Card>

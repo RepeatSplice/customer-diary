@@ -107,10 +107,21 @@ export const customerDiary = pgTable(
     lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
 
+    // Payment fields
+    paymentMethod: text("payment_method"),
+    amountPaid: numeric("amount_paid", { precision: 12, scale: 2 }).default(
+      "0"
+    ),
+    invoicePO: text("invoice_po"),
+    paidAt: date("paid_at"),
+
+    // Additional fields
+    storeLocation: text("store_location"),
+    tags: text("tags"),
+
     subtotal: numeric("subtotal", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
-    tax: numeric("tax", { precision: 12, scale: 2 }).notNull().default("0"),
     total: numeric("total", { precision: 12, scale: 2 }).notNull().default("0"),
 
     createdAt: timestamp("created_at", { withTimezone: true })

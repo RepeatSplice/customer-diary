@@ -12,7 +12,13 @@ const globalForDb = globalThis as unknown as {
 };
 
 export const pool: Pool =
-  globalForDb.__dbPool ?? new Pool({ connectionString });
+  globalForDb.__dbPool ??
+  new Pool({
+    connectionString,
+    ssl: {
+      rejectUnauthorized: false, // Allow self-signed certificates
+    },
+  });
 export const db = globalForDb.__dbClient ?? drizzle(pool);
 
 if (!globalForDb.__dbPool) globalForDb.__dbPool = pool;

@@ -1,4 +1,3 @@
-import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
