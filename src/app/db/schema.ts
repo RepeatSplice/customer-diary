@@ -119,6 +119,13 @@ export const customerDiary = pgTable(
     storeLocation: text("store_location"),
     tags: text("tags"),
 
+    // Order fields
+    supplier: text("supplier"),
+    orderNo: text("order_no"),
+    etaDate: date("eta_date"),
+    orderStatus: text("order_status").default("pending"),
+    orderNotes: text("order_notes"),
+
     subtotal: numeric("subtotal", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),

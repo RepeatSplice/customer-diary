@@ -41,6 +41,12 @@ export async function GET(
         // Additional fields
         storeLocation: schema.customerDiary.storeLocation,
         tags: schema.customerDiary.tags,
+        // Order fields
+        supplier: schema.customerDiary.supplier,
+        orderNo: schema.customerDiary.orderNo,
+        etaDate: schema.customerDiary.etaDate,
+        orderStatus: schema.customerDiary.orderStatus,
+        orderNotes: schema.customerDiary.orderNotes,
         subtotal: schema.customerDiary.subtotal,
         total: schema.customerDiary.total,
         createdAt: schema.customerDiary.createdAt,
@@ -192,6 +198,12 @@ export async function PATCH(
       // Additional fields
       storeLocation: body.storeLocation,
       tags: body.tags,
+      // Order fields
+      supplier: body.supplier,
+      orderNo: body.orderNo,
+      etaDate: body.etaDate,
+      orderStatus: body.orderStatus,
+      orderNotes: body.orderNotes,
       // Total amount
       total: body.total ? String(body.total) : undefined,
       // Archive field

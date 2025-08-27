@@ -11,6 +11,10 @@ import {
   Archive,
   ShieldAlert,
   AlertCircle,
+  Mail,
+  Phone,
+  User,
+  Hash,
 } from "lucide-react";
 
 // shadcn/ui
@@ -53,6 +57,7 @@ import { Attachments } from "@/components/diary/Attachments";
 import { Followups } from "@/components/diary/Followups";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 type StaffMember = {
   id: string;
@@ -111,6 +116,12 @@ type Patchable = {
   total?: string;
   // Staff assignment
   assignedTo?: string | null; // UUID of assigned staff member
+  // Order fields
+  supplier?: string;
+  orderNo?: string;
+  etaDate?: string | null; // yyyy-mm-dd
+  orderStatus?: string;
+  orderNotes?: string;
 };
 
 // simple deep-equal
@@ -163,6 +174,12 @@ export default function DiaryDetail({ id }: { id: string }) {
       total: data.total ?? "",
       // Staff assignment
       assignedTo: data.assignedTo ?? null,
+      // Order fields
+      supplier: data.supplier ?? "",
+      orderNo: data.orderNo ?? "",
+      etaDate: data.etaDate ?? null,
+      orderStatus: data.orderStatus ?? "pending",
+      orderNotes: data.orderNotes ?? "",
     };
 
     console.log("Setting initial form state:", initial);
@@ -215,6 +232,12 @@ export default function DiaryDetail({ id }: { id: string }) {
       total: data.total ?? "",
       // Staff assignment
       assignedTo: data.assignedTo ?? null,
+      // Order fields
+      supplier: data.supplier ?? "",
+      orderNo: data.orderNo ?? "",
+      etaDate: data.etaDate ?? null,
+      orderStatus: data.orderStatus ?? "pending",
+      orderNotes: data.orderNotes ?? "",
     };
     return obj;
   }, [data]);
@@ -326,7 +349,8 @@ export default function DiaryDetail({ id }: { id: string }) {
     balance: (() => {
       const tot = Number(form?.total || data.total || 0);
       const paid = Number(form?.amountPaid || "0");
-      return (tot - paid).toFixed(2);
+      const balance = tot - paid;
+      return balance >= 0 ? balance.toFixed(2) : "0.00";
     })(),
   };
 
@@ -369,6 +393,28 @@ export default function DiaryDetail({ id }: { id: string }) {
                 <div className="text-lg font-semibold">
                   Diary Detail for {data.customer?.name}
                 </div>
+                {data.customer && (
+                  <div className="text-sm text-muted-foreground mt-1 flex items-center gap-4">
+                    {data.customer.email && (
+                      <span className="flex items-center gap-1">
+                        <Mail className="h-3 w-3" />
+                        {data.customer.email}
+                      </span>
+                    )}
+                    {data.customer.phone && (
+                      <span className="flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {data.customer.phone}
+                      </span>
+                    )}
+                    {data.customer.accountNo && (
+                      <span className="flex items-center gap-1">
+                        <Hash className="h-3 w-3" />
+                        {data.customer.accountNo}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -438,16 +484,68 @@ export default function DiaryDetail({ id }: { id: string }) {
       </Card>
 
       {/* Tabs */}
-      <Tabs defaultValue="summary" className="mt-4">
+      <Tabs
+        defaultValue="summary"
+        className="mt-4"
+        onValueChange={async (value) => {
+          // Auto-save when switching tabs if there are unsaved changes
+          if (dirty) {
+            await doSave();
+          }
+        }}
+      >
         <TabsList>
           <TabsTrigger value="summary">Summary</TabsTrigger>
           <TabsTrigger value="products">Products</TabsTrigger>
+          <TabsTrigger value="order">Order Details</TabsTrigger>
           <TabsTrigger value="followups">Follow-ups</TabsTrigger>
           <TabsTrigger value="files">Attachments</TabsTrigger>
         </TabsList>
 
         {/* SUMMARY */}
         <TabsContent value="summary" className="space-y-4">
+          {/* Customer Information */}
+          {data.customer && (
+            <Card className="rounded-2xl border shadow-sm">
+              <CardHeader>
+                <CardTitle>Customer Information</CardTitle>
+                <CardDescription>
+                  Customer contact details and account information.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-semibold pb-2 flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Name
+                  </Label>
+                  <Input value={data.customer.name || ""} disabled />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold pb-2 flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </Label>
+                  <Input value={data.customer.email || ""} disabled />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold pb-2 flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    Phone
+                  </Label>
+                  <Input value={data.customer.phone || ""} disabled />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold pb-2 flex items-center gap-2">
+                    <Hash className="h-4 w-4" />
+                    Account Code
+                  </Label>
+                  <Input value={data.customer.accountNo || ""} disabled />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Status & Flags */}
           <Card className="rounded-2xl border shadow-sm">
             <CardHeader>
@@ -721,8 +819,18 @@ export default function DiaryDetail({ id }: { id: string }) {
 
               {/* Summary line */}
               <div className="text-right text-sm text-muted-foreground">
-                Subtotal ${totals.subtotal} • Total ${totals.total} •{" "}
-                <span className="font-medium">Balance ${totals.balance}</span>
+                Subtotal: ${Number(totals.subtotal || 0).toFixed(2)} • Total: $
+                {Number(totals.total || 0).toFixed(2)} •{" "}
+                <span
+                  className={cn(
+                    "font-medium",
+                    Number(totals.balance) > 0
+                      ? "text-red-600"
+                      : "text-green-600"
+                  )}
+                >
+                  Balance: ${totals.balance}
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -742,6 +850,77 @@ export default function DiaryDetail({ id }: { id: string }) {
               mutate();
             }}
           />
+        </TabsContent>
+
+        {/* ORDER DETAILS */}
+        <TabsContent value="order">
+          <Card className="rounded-2xl border shadow-sm">
+            <CardHeader>
+              <CardTitle>Order Information</CardTitle>
+              <CardDescription>
+                Supplier details, order numbers, and delivery information.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-semibold pb-2">Supplier</Label>
+                <Input
+                  value={form?.supplier || ""}
+                  onChange={(e) => set("supplier", e.target.value)}
+                  placeholder="e.g. Black Magic Tackle"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold pb-2">
+                  Order Number
+                </Label>
+                <Input
+                  value={form?.orderNo || ""}
+                  onChange={(e) => set("orderNo", e.target.value)}
+                  placeholder="e.g. ORD-2024-001"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold pb-2">ETA Date</Label>
+                <Input
+                  type="date"
+                  value={form?.etaDate ?? ""}
+                  onChange={(e) => set("etaDate", e.target.value || null)}
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold pb-2">
+                  Order Status
+                </Label>
+                <Select
+                  value={form?.orderStatus || "pending"}
+                  onValueChange={(value) => set("orderStatus", value)}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="ordered">Ordered</SelectItem>
+                    <SelectItem value="shipped">Shipped</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-sm font-semibold pb-2">
+                  Order Notes
+                </Label>
+                <Textarea
+                  rows={3}
+                  value={form?.orderNotes || ""}
+                  onChange={(e) => set("orderNotes", e.target.value)}
+                  placeholder="Additional order details, tracking info, etc."
+                />
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* FOLLOW-UPS */}

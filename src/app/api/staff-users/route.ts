@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { and, eq, ilike, or, sql } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -146,6 +147,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Hash the PIN before storing
+    const pinHash = await bcrypt.hash(String(pin), 10);
+
     // Create new staff user
     const [newUser] = await db
       .insert(schema.staffUsers)
@@ -153,7 +157,7 @@ export async function POST(req: NextRequest) {
         fullName,
         staffCode: staffCode.toUpperCase(),
         role,
-        pinHash: String(pin), // Note: In production, this should be hashed
+        pinHash: pinHash,
       })
       .returning();
 

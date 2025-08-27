@@ -58,6 +58,18 @@ export const diaryCreateSchema = z.object({
   // Additional fields
   storeLocation: z.string().optional(),
   tags: z.string().optional(),
+  // Order fields
+  supplier: z.string().optional(),
+  orderNo: z.string().optional(),
+  etaDate: z
+    .string()
+    .date()
+    .optional()
+    .or(z.literal(""))
+    .or(z.null())
+    .transform((v) => (v === "" ? null : v)),
+  orderStatus: z.string().optional(),
+  orderNotes: z.string().optional(),
   // Total amount
   total: z
     .union([
@@ -107,6 +119,18 @@ export const diaryPatchSchema = z.object({
   // Additional fields
   storeLocation: z.string().optional(),
   tags: z.string().optional(),
+  // Order fields
+  supplier: z.string().optional(),
+  orderNo: z.string().optional(),
+  etaDate: z
+    .string()
+    .date()
+    .optional()
+    .or(z.literal(""))
+    .or(z.null())
+    .transform((v) => (v === "" ? null : v)),
+  orderStatus: z.string().optional(),
+  orderNotes: z.string().optional(),
   // Total amount
   total: z
     .union([
