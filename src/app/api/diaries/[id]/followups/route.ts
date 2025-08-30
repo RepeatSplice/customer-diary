@@ -19,7 +19,7 @@ export async function POST(
       diaryId: diaryId,
       entryType: body.entryType,
       message: body.message,
-      staffCode: session.user.staffCode,
+      staffCode: body.staffCode || session.user.staffCode,
     })
     .returning();
   return NextResponse.json(f);
@@ -38,7 +38,7 @@ export async function PATCH(
     .set({
       entryType: body.entryType,
       message: body.message,
-      staffCode: body.staffCode,
+      staffCode: body.staffCode || null,
     })
     .where(eq(schema.diaryFollowups.id, body.id))
     .returning();

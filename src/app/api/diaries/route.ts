@@ -97,6 +97,12 @@ export async function POST(req: NextRequest) {
         // Additional fields
         storeLocation: body.storeLocation,
         tags: body.tags,
+        // Order fields
+        supplier: body.supplier,
+        orderNo: body.orderNo,
+        etaDate: body.etaDate,
+        orderStatus: body.orderStatus ?? "pending",
+        orderNotes: body.orderNotes,
         // Total amount
         total: body.total ? String(body.total) : "0",
       })

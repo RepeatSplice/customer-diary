@@ -68,7 +68,7 @@ export const diaryCreateSchema = z.object({
     .or(z.literal(""))
     .or(z.null())
     .transform((v) => (v === "" ? null : v)),
-  orderStatus: z.string().optional(),
+  orderStatus: z.string().optional().default("pending"),
   orderNotes: z.string().optional(),
   // Total amount
   total: z
@@ -154,4 +154,5 @@ export const diaryPatchSchema = z.object({
 export const followupCreateSchema = z.object({
   entryType: z.enum(["note", "call", "sms", "email"]).default("note"),
   message: z.string().min(1),
+  staffCode: z.string().optional(),
 });

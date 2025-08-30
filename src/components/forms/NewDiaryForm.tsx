@@ -294,13 +294,14 @@ export default function NewDiaryForm() {
   // meta
   const [tags, setTags] = useState("");
   const [storeLocation, setStoreLocation] = useState("");
-  const [receivedDate, setReceivedDate] = useState<Date | undefined>(
-    new Date()
-  );
   const [dueDate, setDueDate] = useState<Date | undefined>();
 
   // order
-  const [order, setOrder] = useState({ supplier: "", orderNo: "" });
+  const [order, setOrder] = useState({
+    supplier: "",
+    orderNo: "",
+    orderNotes: "",
+  });
   const [etaDate, setEtaDate] = useState<Date | undefined>();
 
   // flags / payment
@@ -360,11 +361,7 @@ export default function NewDiaryForm() {
       priority,
       tags,
       storeLocation,
-
-      // ⬇️ change these 3 lines
-      dateReceived: sendDate(receivedDate),
       dueDate: sendDate(dueDate),
-      eta: sendDate(etaDate),
 
       isPaid: flags.isPaid,
       isOrdered: flags.isOrdered,
@@ -375,9 +372,13 @@ export default function NewDiaryForm() {
 
       supplier: order.supplier,
       orderNo: order.orderNo,
+      etaDate: sendDate(etaDate),
+      orderStatus: "pending",
+      orderNotes: order.orderNotes,
 
       products,
       adminNotes,
+      total: total.toFixed(2),
     };
 
     const res = await fetch("/api/diaries", {
@@ -402,7 +403,13 @@ export default function NewDiaryForm() {
       toast({ title: "Diary created", description: "Redirecting…" });
       window.location.href = `/diaries/${d.id}`;
     } else {
-      // existing error toast
+      const errorText = await res.text();
+      console.error("Create failed:", errorText);
+      toast({
+        title: "Failed to create diary",
+        description: errorText || "Please check your input and try again",
+        variant: "destructive",
+      });
     }
   }
 
@@ -583,16 +590,11 @@ export default function NewDiaryForm() {
             </CardHeader>
             <CardContent className="grid lg:grid-cols-2 gap-4">
               <DateField
-                label="Date received"
-                value={receivedDate}
-                onChange={setReceivedDate}
-              />
-              <DateField
                 label="Due date"
                 value={dueDate}
                 onChange={setDueDate}
               />
-              <div className="lg:col-span-2">
+              <div>
                 <Label className="text-sm font-semibold pb-2">
                   Store location
                 </Label>
@@ -602,7 +604,7 @@ export default function NewDiaryForm() {
                   onChange={(e) => setStoreLocation(e.target.value)}
                 />
               </div>
-              <div className="lg:col-span-3">
+              <div className="lg:col-span-2">
                 <Label className="pb-2 text-sm font-semibold">
                   Tags (comma separated)
                 </Label>
@@ -792,6 +794,19 @@ export default function NewDiaryForm() {
                 />
               </div>
               <DateField label="ETA" value={etaDate} onChange={setEtaDate} />
+              <div className="lg:col-span-3">
+                <Label className="text-sm font-semibold pb-2">
+                  Order Notes
+                </Label>
+                <Textarea
+                  placeholder="Additional order details, tracking info, etc."
+                  value={order.orderNotes}
+                  onChange={(e) =>
+                    setOrder({ ...order, orderNotes: e.target.value })
+                  }
+                  rows={3}
+                />
+              </div>
             </CardContent>
           </Card>
         </motion.section>

@@ -9,6 +9,7 @@ import { Search, Filter, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectTrigger,
@@ -335,16 +336,25 @@ export default function ArchivesList() {
   }
 
   return (
-    <div className="w-full px-6 pb-12">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="w-full px-4 sm:px-6 lg:px-8 pb-12 max-w-[1400px] mx-auto">
+      {/* Header with better spacing for wide screens */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Archives</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
+            Archives
+          </h1>
+          <p className="text-gray-600 mt-1">
             View and manage archived diaries. Restore them to the main dashboard
             or permanently delete them.
           </p>
         </div>
-        <Button onClick={fetchArchivedDiaries} variant="outline" size="sm">
+        <Button
+          onClick={fetchArchivedDiaries}
+          variant="outline"
+          size="lg"
+          className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 hover:scale-105 transition-all duration-300 shadow-sm"
+        >
+          <RotateCcw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
       </div>
@@ -355,386 +365,401 @@ export default function ArchivesList() {
         </div>
       )}
 
-      {/* Filter/search bar */}
-      <div className="rounded-2xl border shadow-sm bg-white p-4 mb-5">
-        {/* Row 1: search + quick filters to the right */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[280px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-9 w-full"
-              placeholder="Search customer / phone / request / location"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="h-10 w-[160px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Status: All</SelectItem>
-              <SelectItem value="Pending">Pending</SelectItem>
-              <SelectItem value="Ordered">Ordered</SelectItem>
-              <SelectItem value="ReadyForPickup">Ready for Pickup</SelectItem>
-              <SelectItem value="Collected">Collected</SelectItem>
-              <SelectItem value="Cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={priority} onValueChange={setPriority}>
-            <SelectTrigger className="h-10 w-[160px]">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Priority: All</SelectItem>
-              <SelectItem value="Low">Low</SelectItem>
-              <SelectItem value="Normal">Normal</SelectItem>
-              <SelectItem value="High">High</SelectItem>
-              <SelectItem value="Urgent">Urgent</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={staff} onValueChange={setStaff}>
-            <SelectTrigger className="h-10 w-[160px]">
-              <SelectValue placeholder="Staff" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Staff: All</SelectItem>
-              {staffOptions.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Row 2: dates + tags + toggles */}
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Label className="text-xs">From</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="justify-start h-10 font-normal w-[160px]"
-                >
-                  {fromDate ? format(fromDate, "dd MMM yyyy") : "Pick a date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="p-2">
-                <Calendar
-                  mode="single"
-                  selected={fromDate}
-                  onSelect={setFromDate}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Label className="text-xs">To</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="justify-start h-10 font-normal w-[160px]"
-                >
-                  {toDate ? format(toDate, "dd MMM yyyy") : "Pick a date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="p-2">
-                <Calendar
-                  mode="single"
-                  selected={toDate}
-                  onSelect={setToDate}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <Input
-            className="w-[260px]"
-            placeholder="Tags e.g. vip, warranty"
-            value={tagQuery}
-            onChange={(e) => setTagQuery(e.target.value)}
-          />
-
-          <Button
-            type="button"
-            variant={onlyPaid ? "default" : "outline"}
-            className={cn(
-              "h-10",
-              onlyPaid && "bg-green-600 hover:bg-green-700"
-            )}
-            onClick={() => setOnlyPaid((v) => !v)}
-          >
-            <Filter className="h-4 w-4 mr-2" />{" "}
-            {onlyPaid ? "Paid only" : "Filter: paid"}
-          </Button>
-
-          <Button
-            type="button"
-            variant={onlyOrdered ? "default" : "outline"}
-            className={cn(
-              "h-10",
-              onlyOrdered && "bg-green-600 hover:bg-green-700"
-            )}
-            onClick={() => setOnlyOrdered((v) => !v)}
-          >
-            <Filter className="h-4 w-4 mr-2" />{" "}
-            {onlyOrdered ? "Ordered only" : "Filter: ordered"}
-          </Button>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="overflow-hidden rounded-2xl border shadow-sm bg-white">
-        <div className="grid grid-cols-12 px-4 py-3 text-xs font-medium text-muted-foreground">
-          <div className="col-span-3">Customer & Request</div>
-          <div className="col-span-2">Status & Priority</div>
-          <div className="col-span-2">Payment & Order</div>
-          <div className="col-span-2">Staff & Dates</div>
-          <div className="col-span-2">Location & Tags</div>
-          <div className="col-span-1 text-right">Actions</div>
-        </div>
-        <div className="h-px bg-border" />
-
-        {/* Rows */}
-        <AnimatePresence>
-          {loading && (
-            <div className="p-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="animate-pulse h-14 bg-muted/40 rounded-xl mb-2"
-                />
-              ))}
+      {/* Enhanced Filter/Search Section - optimized for smaller screens */}
+      <Card className="rounded-2xl border-rounded shadow-lg mb-6 sm:mb-8 bg-gradient-to-r from-gray-50 to-gray-100">
+        <CardContent className="p-4 sm:p-6">
+          {/* Row 1: search + quick filters to the right */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[280px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-9 w-full"
+                placeholder="Search customer / phone / request / location"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
-          )}
 
-          {!loading && pageItems.length === 0 && (
-            <motion.div
-              variants={fade}
-              initial="hidden"
-              animate="show"
-              className="p-12 text-center text-muted-foreground"
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger className="h-10 w-[160px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Status: All</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
+                <SelectItem value="Ordered">Ordered</SelectItem>
+                <SelectItem value="ReadyForPickup">Ready for Pickup</SelectItem>
+                <SelectItem value="Collected">Collected</SelectItem>
+                <SelectItem value="Cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={priority} onValueChange={setPriority}>
+              <SelectTrigger className="h-10 w-[160px]">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Priority: All</SelectItem>
+                <SelectItem value="Low">Low</SelectItem>
+                <SelectItem value="Normal">Normal</SelectItem>
+                <SelectItem value="High">High</SelectItem>
+                <SelectItem value="Urgent">Urgent</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={staff} onValueChange={setStaff}>
+              <SelectTrigger className="h-10 w-[160px]">
+                <SelectValue placeholder="Staff" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Staff: All</SelectItem>
+                {staffOptions.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Row 2: dates + tags + toggles */}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs">From</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="justify-start h-10 font-normal w-[160px]"
+                  >
+                    {fromDate ? format(fromDate, "dd MMM yyyy") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="p-2">
+                  <Calendar
+                    mode="single"
+                    selected={fromDate}
+                    onSelect={setFromDate}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Label className="text-xs">To</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="justify-start h-10 font-normal w-[160px]"
+                  >
+                    {toDate ? format(toDate, "dd MMM yyyy") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="p-2">
+                  <Calendar
+                    mode="single"
+                    selected={toDate}
+                    onSelect={setToDate}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <Input
+              className="w-[260px]"
+              placeholder="Tags e.g. vip, warranty"
+              value={tagQuery}
+              onChange={(e) => setTagQuery(e.target.value)}
+            />
+
+            <Button
+              type="button"
+              variant={onlyPaid ? "default" : "outline"}
+              className={cn(
+                "h-10",
+                onlyPaid && "bg-green-600 hover:bg-green-700"
+              )}
+              onClick={() => setOnlyPaid((v) => !v)}
             >
-              No archived diaries match your filters.{" "}
-              <Button
-                variant="link"
-                onClick={() => {
-                  setSearch("");
-                  setStatus("all");
-                  setPriority("all");
-                  setStaff("all");
-                  setFromDate(undefined);
-                  setToDate(undefined);
-                  setTagQuery("");
-                  setOnlyPaid(false);
-                  setOnlyOrdered(false);
-                }}
-              >
-                Clear filters
-              </Button>
-            </motion.div>
-          )}
+              <Filter className="h-4 w-4 mr-2" />{" "}
+              {onlyPaid ? "Paid only" : "Filter: paid"}
+            </Button>
 
-          {!loading &&
-            pageItems.map((d) => (
+            <Button
+              type="button"
+              variant={onlyOrdered ? "default" : "outline"}
+              className={cn(
+                "h-10",
+                onlyOrdered && "bg-green-600 hover:bg-green-700"
+              )}
+              onClick={() => setOnlyOrdered((v) => !v)}
+            >
+              <Filter className="h-4 w-4 mr-2" />{" "}
+              {onlyOrdered ? "Ordered only" : "Filter: ordered"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Enhanced Table - matching dashboard styling */}
+      <Card className="rounded-2xl border-rounded shadow-lg bg-white">
+        <CardContent className="p-0">
+          <div className="grid grid-cols-12 px-4 py-3 text-xs font-medium text-muted-foreground">
+            <div className="col-span-3">Customer & Request</div>
+            <div className="col-span-2">Status & Priority</div>
+            <div className="col-span-2">Payment & Order</div>
+            <div className="col-span-2">Staff & Dates</div>
+            <div className="col-span-2">Location & Tags</div>
+            <div className="col-span-1 text-right">Actions</div>
+          </div>
+          <div className="h-px bg-border" />
+
+          {/* Rows */}
+          <AnimatePresence>
+            {loading && (
+              <div className="p-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="animate-pulse h-14 bg-muted/40 rounded-xl mb-2"
+                  />
+                ))}
+              </div>
+            )}
+
+            {!loading && pageItems.length === 0 && (
               <motion.div
-                key={d.id}
                 variants={fade}
                 initial="hidden"
                 animate="show"
-                exit={{ opacity: 0 }}
-                className="grid grid-cols-12 px-4 py-4 items-center hover:bg-muted/30"
+                className="p-12 text-center text-muted-foreground"
               >
-                <div className="col-span-3">
-                  <div className="font-medium">
-                    {d.customerName || "No customer"}
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {d.whatTheyWant}
-                  </div>
-                  {d.customerPhone && (
-                    <div className="text-xs text-muted-foreground">
-                      {d.customerPhone}
-                    </div>
-                  )}
-                </div>
+                No archived diaries match your filters.{" "}
+                <Button
+                  variant="link"
+                  onClick={() => {
+                    setSearch("");
+                    setStatus("all");
+                    setPriority("all");
+                    setStaff("all");
+                    setFromDate(undefined);
+                    setToDate(undefined);
+                    setTagQuery("");
+                    setOnlyPaid(false);
+                    setOnlyOrdered(false);
+                  }}
+                >
+                  Clear filters
+                </Button>
+              </motion.div>
+            )}
 
-                <div className="col-span-2">
-                  <div className="flex flex-col gap-1">
-                    <StatusBadge
-                      status={
-                        d.status as
-                          | "Pending"
-                          | "Ordered"
-                          | "ReadyForPickup"
-                          | "Collected"
-                          | "Cancelled"
-                      }
-                    />
-                    <PriorityBadge
-                      priority={
-                        d.priority as "Low" | "Normal" | "High" | "Urgent"
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="col-span-2">
-                  <div className="text-xs space-y-1">
-                    <div
-                      className={cn(
-                        d.isPaid ? "text-green-600" : "text-muted-foreground"
-                      )}
-                    >
-                      {d.isPaid ? "✓ Paid" : "✗ Unpaid"}
+            {!loading &&
+              pageItems.map((d) => (
+                <motion.div
+                  key={d.id}
+                  variants={fade}
+                  initial="hidden"
+                  animate="show"
+                  exit={{ opacity: 0 }}
+                  className="grid grid-cols-12 px-4 py-4 items-center hover:bg-muted/30"
+                >
+                  <div className="col-span-3">
+                    <div className="font-medium">
+                      {d.customerName || "No customer"}
                     </div>
-                    <div
-                      className={cn(
-                        d.isOrdered ? "text-blue-600" : "text-muted-foreground"
-                      )}
-                    >
-                      {d.isOrdered ? "✓ Ordered" : "✗ Not ordered"}
+                    <div className="text-xs text-muted-foreground truncate">
+                      {d.whatTheyWant}
                     </div>
-                    {d.total && <div className="font-medium">${d.total}</div>}
-                  </div>
-                </div>
-
-                <div className="col-span-2">
-                  <div className="text-xs space-y-1">
-                    <div>By: {d.createdByCode || "—"}</div>
-                    <div className="text-muted-foreground">
-                      {d.createdAt
-                        ? `Created ${format(
-                            new Date(d.createdAt),
-                            "dd MMM yyyy"
-                          )}`
-                        : null}
-                    </div>
-                    <div className="text-muted-foreground">
-                      {d.archivedAt
-                        ? `Archived ${format(
-                            new Date(d.archivedAt),
-                            "dd MMM yyyy"
-                          )}`
-                        : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="col-span-2">
-                  <div className="text-xs space-y-1">
-                    {d.storeLocation && (
-                      <div className="truncate">{d.storeLocation}</div>
-                    )}
-                    {d.tags && (
-                      <div className="text-muted-foreground truncate">
-                        Tags: {d.tags}
+                    {d.customerPhone && (
+                      <div className="text-xs text-muted-foreground">
+                        {d.customerPhone}
                       </div>
                     )}
                   </div>
-                </div>
 
-                <div className="col-span-1 flex justify-end gap-1">
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="outline" className="gap-1">
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Restore diary?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will move the diary back to the main dashboard
-                          and make it active again.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-green-600 hover:bg-green-700"
-                          onClick={() => restoreDiary(d.id)}
+                  <div className="col-span-2">
+                    <div className="flex flex-col gap-1">
+                      <StatusBadge
+                        status={
+                          d.status as
+                            | "Pending"
+                            | "Ordered"
+                            | "ReadyForPickup"
+                            | "Collected"
+                            | "Cancelled"
+                        }
+                      />
+                      <PriorityBadge
+                        priority={
+                          d.priority as "Low" | "Normal" | "High" | "Urgent"
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-span-2">
+                    <div className="text-xs space-y-1">
+                      <div
+                        className={cn(
+                          d.isPaid ? "text-green-600" : "text-muted-foreground"
+                        )}
+                      >
+                        {d.isPaid ? "✓ Paid" : "✗ Unpaid"}
+                      </div>
+                      <div
+                        className={cn(
+                          d.isOrdered
+                            ? "text-blue-600"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {d.isOrdered ? "✓ Ordered" : "✗ Not ordered"}
+                      </div>
+                      {d.total && <div className="font-medium">${d.total}</div>}
+                    </div>
+                  </div>
+
+                  <div className="col-span-2">
+                    <div className="text-xs space-y-1">
+                      <div>By: {d.createdByCode || "—"}</div>
+                      <div className="text-muted-foreground">
+                        {d.createdAt
+                          ? `Created ${format(
+                              new Date(d.createdAt),
+                              "dd MMM yyyy"
+                            )}`
+                          : null}
+                      </div>
+                      <div className="text-muted-foreground">
+                        {d.archivedAt
+                          ? `Archived ${format(
+                              new Date(d.archivedAt),
+                              "dd MMM yyyy"
+                            )}`
+                          : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-span-2">
+                    <div className="text-xs space-y-1">
+                      {d.storeLocation && (
+                        <div className="truncate">{d.storeLocation}</div>
+                      )}
+                      {d.tags && (
+                        <div className="text-muted-foreground truncate">
+                          Tags: {d.tags}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="col-span-1 flex justify-end gap-1">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-9 w-9 p-0 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 hover:scale-105 transition-all duration-300 rounded-xl"
                         >
-                          Restore
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Restore diary?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will move the diary back to the main dashboard
+                            and make it active again.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => restoreDiary(d.id)}
+                          >
+                            Restore
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
 
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="destructive" className="gap-1">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          Permanently delete diary?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently delete the diary and all related
-                          data. This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-red-600 hover:bg-red-700"
-                          onClick={() => deleteDiary(d.id)}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-9 w-9 p-0 bg-red-50 border-red-200 text-red-700 hover:bg-red-100 hover:border-red-300 hover:scale-105 transition-all duration-300 rounded-xl"
                         >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </motion.div>
-            ))}
-        </AnimatePresence>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            Permanently delete diary?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete the diary and all
+                            related data. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={() => deleteDiary(d.id)}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </motion.div>
+              ))}
+          </AnimatePresence>
 
-        {/* Footer / pagination */}
-        {!loading && filtered.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/30">
-            <div className="text-xs text-muted-foreground">
-              Showing{" "}
-              <span className="font-medium">{(page - 1) * pageSize + 1}</span>–
-              <span className="font-medium">
-                {Math.min(page * pageSize, filtered.length)}
-              </span>{" "}
-              of {filtered.length}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={page === 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Prev
-              </Button>
-              <div className="text-xs">
-                Page {page} / {totalPages}
+          {/* Footer / pagination */}
+          {!loading && filtered.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/30">
+              <div className="text-xs text-muted-foreground">
+                Showing{" "}
+                <span className="font-medium">{(page - 1) * pageSize + 1}</span>
+                –
+                <span className="font-medium">
+                  {Math.min(page * pageSize, filtered.length)}
+                </span>{" "}
+                of {filtered.length}
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={page === totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Next
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Prev
+                </Button>
+                <div className="text-xs">
+                  Page {page} / {totalPages}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -5,7 +5,21 @@ import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { format } from "date-fns";
-import { Search, Filter, Archive, RefreshCw } from "lucide-react";
+import {
+  Search,
+  Filter,
+  Archive,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  DollarSign,
+  User,
+  Phone,
+  Mail,
+  Hash,
+  Clock,
+} from "lucide-react";
 
 // shadcn/ui
 import {
@@ -16,7 +30,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectTrigger,
@@ -29,7 +42,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 
 import { StatusBadge } from "@/components/StatusBadge";
@@ -54,6 +67,7 @@ interface DiaryRow {
   dueDate?: string | null;
   isPaid?: boolean | null;
   staff?: string | null; // createdByCode or display name
+  assignedTo?: string | null; // assigned staff member
   customer?: {
     id: string;
     name: string | null;
@@ -77,6 +91,7 @@ interface DiaryApiResponse {
   isPaid?: boolean | null;
   createdByCode?: string | null;
   createdBy?: string | null;
+  assignedTo?: string | null;
   customer?: {
     id: string;
     name: string | null;
@@ -117,7 +132,10 @@ const PRIORITY_OPTIONS: Priority[] = ["Low", "Normal", "High", "Urgent"];
 
 // ---------- Page ----------
 export default function DashboardPage() {
-  const [rows, setRows] = React.useState<DiaryRow[] | null>(null);
+  const [activeRows, setActiveRows] = React.useState<DiaryRow[] | null>(null);
+  const [archivedRows, setArchivedRows] = React.useState<DiaryRow[] | null>(
+    null
+  );
   const [loading, setLoading] = React.useState(true);
 
   // filters
@@ -131,28 +149,45 @@ export default function DashboardPage() {
   const [toDate, setToDate] = React.useState<Date | undefined>(undefined);
   const [tagQuery, setTagQuery] = React.useState("");
 
+  // pagination
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 12;
+
   const debouncedSearch = useDebounced(search, 250);
 
   const fetchDiaries = React.useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/diaries?archived=0&limit=200");
-      if (!res.ok) throw new Error(await res.text());
-      const data: DiaryApiResponse[] = await res.json();
-      const mapped: DiaryRow[] = data.map((d: DiaryApiResponse) => ({
-        id: d.id,
-        whatTheyWant: d.whatTheyWant ?? null,
-        status: (d.status ?? "Pending") as Status,
-        priority: (d.priority ?? "Normal") as Priority,
-        total: d.total ?? d.subtotal ?? 0,
-        createdAt: d.createdAt,
-        dueDate: d.dueDate ?? null,
-        isPaid: d.isPaid ?? null,
-        staff: d.createdByCode ?? d.createdBy ?? null,
-        customer: d.customer ?? null,
-        tags: d.tags ?? null,
-      }));
-      setRows(mapped);
+      // Fetch both active and archived diaries
+      const [activeRes, archivedRes] = await Promise.all([
+        fetch("/api/diaries?archived=0&limit=200"),
+        fetch("/api/diaries?archived=1&limit=200"),
+      ]);
+
+      if (!activeRes.ok) throw new Error(await activeRes.text());
+      if (!archivedRes.ok) throw new Error(await archivedRes.text());
+
+      const activeData: DiaryApiResponse[] = await activeRes.json();
+      const archivedData: DiaryApiResponse[] = await archivedRes.json();
+
+      const mapData = (data: DiaryApiResponse[]): DiaryRow[] =>
+        data.map((d: DiaryApiResponse) => ({
+          id: d.id,
+          whatTheyWant: d.whatTheyWant ?? null,
+          status: (d.status ?? "Pending") as Status,
+          priority: (d.priority ?? "Normal") as Priority,
+          total: d.total ?? d.subtotal ?? 0,
+          createdAt: d.createdAt,
+          dueDate: d.dueDate ?? null,
+          isPaid: d.isPaid ?? null,
+          staff: d.createdByCode ?? d.createdBy ?? null,
+          assignedTo: d.assignedTo ?? null,
+          customer: d.customer ?? null,
+          tags: d.tags ?? null,
+        }));
+
+      setActiveRows(mapData(activeData));
+      setArchivedRows(mapData(archivedData));
     } catch (e) {
       console.error("Failed to fetch diaries:", e);
     } finally {
@@ -163,6 +198,21 @@ export default function DashboardPage() {
   React.useEffect(() => {
     fetchDiaries();
   }, [fetchDiaries]);
+
+  // Reset to first page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    status,
+    priority,
+    paid,
+    staff,
+    overdueOnly,
+    fromDate,
+    toDate,
+    debouncedSearch,
+    tagQuery,
+  ]);
 
   // Refresh when page becomes visible (e.g., user returns from archives)
   React.useEffect(() => {
@@ -179,12 +229,12 @@ export default function DashboardPage() {
 
   const staffOptions = React.useMemo(() => {
     const s = new Set<string>();
-    rows?.forEach((r) => r.staff && s.add(r.staff));
+    activeRows?.forEach((r) => r.staff && s.add(r.staff));
     return Array.from(s);
-  }, [rows]);
+  }, [activeRows]);
 
   const stats = React.useMemo(() => {
-    const all = rows ?? [];
+    const all = [...(activeRows ?? []), ...(archivedRows ?? [])];
     const now = new Date();
     const active = all.filter(
       (r) => !["Collected", "Cancelled"].includes(r.status)
@@ -202,14 +252,16 @@ export default function DashboardPage() {
       const days = (Date.now() - created.getTime()) / (1000 * 60 * 60 * 24);
       return days <= 30;
     }).length;
-    return { active, overdue, last30 };
-  }, [rows]);
+    const total = all.length;
+    const completed = all.filter((r) => r.status === "Collected").length;
+    return { active, overdue, last30, total, completed };
+  }, [activeRows, archivedRows]);
 
   const filtered = React.useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim();
     const tagQ = tagQuery.toLowerCase().trim();
 
-    return (rows ?? [])
+    return (activeRows ?? [])
       .filter((r) => (status === "all" ? true : r.status === status))
       .filter((r) => (priority === "all" ? true : r.priority === priority))
       .filter((r) =>
@@ -258,7 +310,7 @@ export default function DashboardPage() {
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
   }, [
-    rows,
+    activeRows,
     status,
     priority,
     paid,
@@ -270,27 +322,24 @@ export default function DashboardPage() {
     tagQuery,
   ]);
 
-  const applyStatFilter = (key: "active" | "overdue" | "completed30") => {
-    if (key === "active") {
-      setStatus("all");
-      setOverdueOnly(false);
-      setPriority("all");
-      setPaid("all");
-    } else if (key === "overdue") {
-      setOverdueOnly(true);
-      setStatus("all");
-    } else if (key === "completed30") {
-      setStatus("Collected");
-      setOverdueOnly(false);
-    }
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = filtered.slice(startIndex, endIndex);
+
+  // Helper function to truncate text
+  const truncateText = (text: string, maxLength: number) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
   };
 
   return (
-    <div className="w-full px-8 pb-12 max-w-[1920px] mx-auto">
+    <div className="w-full px-4 sm:px-6 lg:px-8 pb-12 max-w-[1400px] mx-auto">
       {/* Header with better spacing for wide screens */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
             Dashboard
           </h1>
           <p className="text-gray-600 mt-1">
@@ -308,134 +357,113 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* Enhanced Stat cards - optimized for 1920px width */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+      {/* Enhanced Stat cards - optimized for smaller screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <motion.div variants={fadeIn} initial="hidden" animate="show">
-          <Card className="rounded-3xl border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 overflow-hidden group">
-            <CardContent className="p-6 relative">
-              <div className="flex items-center justify-between">
+          <Card className="rounded-2xl border-rounded shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 overflow-hidden group h-full">
+            <CardContent className="p-4 sm:p-6 relative h-full flex flex-col">
+              <div className="flex items-center justify-between flex-1">
                 <div className="z-10 relative">
-                  <div className="text-emerald-700 font-medium text-sm uppercase tracking-wide">
+                  <div className="text-emerald-700 font-medium text-xs sm:text-sm uppercase tracking-wide">
                     Active Diaries
                   </div>
-                  <div className="mt-2">
-                    <div className="text-4xl font-bold text-emerald-800">
+                  <div className="mt-1 sm:mt-2">
+                    <div className="text-2xl sm:text-4xl font-bold text-emerald-800">
                       {stats.active}
                     </div>
-                    <div className="text-emerald-600 text-sm mt-1">
+                    <div className="text-emerald-600 text-xs sm:text-sm mt-1">
                       Currently in progress
                     </div>
                   </div>
                 </div>
-                <div className="w-16 h-16 bg-emerald-200 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <div className="text-emerald-800 font-bold text-2xl">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-emerald-200 rounded-xl sm:rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <div className="text-emerald-800 font-bold text-lg sm:text-2xl">
                     {stats.active}
                   </div>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                className="h-auto p-0 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-200/50 mt-4 rounded-xl"
-                onClick={() => applyStatFilter("active")}
-              >
-                View all active →
-              </Button>
             </CardContent>
           </Card>
         </motion.div>
 
         <motion.div variants={fadeIn} initial="hidden" animate="show">
-          <Card className="rounded-3xl border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-red-50 to-red-100 border border-red-200 overflow-hidden group">
-            <CardContent className="p-6 relative">
-              <div className="flex items-center justify-between">
+          <Card className="rounded-2xl border-rounded shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-red-50 to-red-100 border border-red-200 overflow-hidden group h-full">
+            <CardContent className="p-4 sm:p-6 relative h-full flex flex-col">
+              <div className="flex items-center justify-between flex-1">
                 <div className="z-10 relative">
-                  <div className="text-red-700 font-medium text-sm uppercase tracking-wide">
+                  <div className="text-red-700 font-medium text-xs sm:text-sm uppercase tracking-wide">
                     Overdue
                   </div>
-                  <div className="mt-2">
-                    <div className="text-4xl font-bold text-red-800">
+                  <div className="mt-1 sm:mt-2">
+                    <div className="text-2xl sm:text-4xl font-bold text-red-800">
                       {stats.overdue}
                     </div>
-                    <div className="text-red-600 text-sm mt-1">
+                    <div className="text-red-600 text-xs sm:text-sm mt-1">
                       Requires attention
                     </div>
                   </div>
                 </div>
-                <div className="w-16 h-16 bg-red-200 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <div className="text-red-800 font-bold text-2xl">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-red-200 rounded-xl sm:rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <div className="text-red-800 font-bold text-lg sm:text-2xl">
                     {stats.overdue}
                   </div>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                className="h-auto p-0 text-red-700 hover:text-red-800 hover:bg-red-200/50 mt-4 rounded-xl"
-                onClick={() => applyStatFilter("overdue")}
-              >
-                View overdue →
-              </Button>
             </CardContent>
           </Card>
         </motion.div>
 
         <motion.div variants={fadeIn} initial="hidden" animate="show">
-          <Card className="rounded-3xl border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 overflow-hidden group">
-            <CardContent className="p-6 relative">
-              <div className="flex items-center justify-between">
+          <Card className="rounded-2xl border-rounded shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 overflow-hidden group h-full">
+            <CardContent className="p-4 sm:p-6 relative h-full flex flex-col">
+              <div className="flex items-center justify-between flex-1">
                 <div className="z-10 relative">
-                  <div className="text-blue-700 font-medium text-sm uppercase tracking-wide">
-                    Collected (30d)
+                  <div className="text-blue-700 font-medium text-xs sm:text-sm uppercase tracking-wide">
+                    Completed
                   </div>
-                  <div className="mt-2">
-                    <div className="text-4xl font-bold text-blue-800">
-                      {stats.last30}
+                  <div className="mt-1 sm:mt-2">
+                    <div className="text-2xl sm:text-4xl font-bold text-blue-800">
+                      {stats.completed}
                     </div>
-                    <div className="text-blue-600 text-sm mt-1">
-                      Recently completed
+                    <div className="text-blue-600 text-xs sm:text-sm mt-1">
+                      All time completed
                     </div>
                   </div>
                 </div>
-                <div className="w-16 h-16 bg-blue-200 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <div className="text-blue-800 font-bold text-2xl">
-                    {stats.last30}
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-200 rounded-xl sm:rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <div className="text-blue-800 font-bold text-lg sm:text-2xl">
+                    {stats.completed}
                   </div>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                className="h-auto p-0 text-blue-700 hover:text-blue-800 hover:bg-blue-200/50 mt-4 rounded-xl"
-                onClick={() => applyStatFilter("completed30")}
-              >
-                View completed →
-              </Button>
             </CardContent>
           </Card>
         </motion.div>
 
         <motion.div variants={fadeIn} initial="hidden" animate="show">
-          <Card className="rounded-3xl border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 overflow-hidden group">
-            <CardContent className="p-6 relative">
-              <div className="flex items-center justify-between">
+          <Card className="rounded-2xl border-rounded shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 overflow-hidden group h-full">
+            <CardContent className="p-4 sm:p-6 relative h-full flex flex-col">
+              <div className="flex items-center justify-between flex-1">
                 <div className="z-10 relative">
-                  <div className="text-purple-700 font-medium text-sm uppercase tracking-wide">
+                  <div className="text-purple-700 font-medium text-xs sm:text-sm uppercase tracking-wide">
                     Total Diaries
                   </div>
-                  <div className="mt-2">
-                    <div className="text-4xl font-bold text-purple-800">
-                      {rows?.length || 0}
+                  <div className="mt-1 sm:mt-2">
+                    <div className="text-2xl sm:text-4xl font-bold text-purple-800">
+                      {stats.total}
                     </div>
-                    <div className="text-purple-600 text-sm mt-1">
+                    <div className="text-purple-600 text-xs sm:text-sm mt-1">
                       All time records
                     </div>
                   </div>
                 </div>
-                <div className="w-16 h-16 bg-purple-200 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <div className="text-purple-800 font-bold text-2xl">
-                    {rows?.length || 0}
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-200 rounded-xl sm:rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <div className="text-purple-800 font-bold text-lg sm:text-2xl">
+                    {stats.total}
                   </div>
                 </div>
               </div>
-              <div className="text-purple-600 text-xs mt-4">
+              <div className="text-purple-600 text-xs mt-3 sm:mt-4">
                 Complete history
               </div>
             </CardContent>
@@ -443,25 +471,25 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* Enhanced Filter/Search Section - optimized for wide screens */}
-      <Card className="rounded-3xl border-0 shadow-lg mb-8 bg-gradient-to-r from-gray-50 to-gray-100">
-        <CardContent className="p-6">
+      {/* Enhanced Filter/Search Section - optimized for smaller screens */}
+      <Card className="rounded-2xl border-rounded shadow-lg mb-6 sm:mb-8 bg-gradient-to-r from-gray-50 to-gray-100">
+        <CardContent className="p-4 sm:p-6">
           <div className="mb-4">
-            <CardTitle className="text-xl font-bold text-gray-900 mb-2">
+            <CardTitle className="text-lg sm:text-xl font-bold text-gray-900 mb-2">
               Search & Filter Diaries
             </CardTitle>
-            <CardDescription className="text-gray-600">
+            <CardDescription className="text-gray-600 text-sm">
               Find customer diaries by name, email, phone, enquiry, account
               number, or tags
             </CardDescription>
           </div>
 
           {/* Primary search row */}
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative flex-1 max-w-2xl">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
               <Input
-                className="pl-12 h-12 text-lg border-2 border-gray-200 focus:border-blue-500 rounded-xl"
+                className="pl-10 sm:pl-12 h-11 sm:h-12 text-base sm:text-lg border-2 border-gray-200 focus:border-blue-500 rounded-xl"
                 placeholder="Search by customer name, email, phone, enquiry, account #…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -472,147 +500,203 @@ export default function DashboardPage() {
               type="button"
               variant={overdueOnly ? "default" : "outline"}
               className={cn(
-                "h-12 px-6 transition-all duration-300 hover:scale-105 rounded-xl font-medium",
+                "h-11 sm:h-12 px-4 sm:px-6 transition-all duration-300 hover:scale-105 rounded-xl font-medium text-sm sm:text-base",
                 overdueOnly
                   ? "bg-red-600 hover:bg-red-700 shadow-lg"
                   : "bg-red-50 border-red-200 text-red-700 hover:bg-red-100 hover:border-red-300"
               )}
               onClick={() => setOverdueOnly((v) => !v)}
             >
-              <Filter className="h-5 w-5 mr-2" />
+              <Filter className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
               {overdueOnly ? "Overdue Only" : "Show Overdue"}
             </Button>
           </div>
 
-          {/* Filter controls - 2 rows for better organization */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Row 1: Status, Priority, Payment */}
-            <div className="flex items-center gap-4">
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="h-12 w-[180px] border-2 rounded-xl">
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  {STATUS_OPTIONS.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {/* Filter controls - responsive grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger className="h-11 sm:h-12 border-2 rounded-xl text-sm [&[data-state=open]>svg]:rotate-180">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {STATUS_OPTIONS.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-              <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger className="h-12 w-[160px] border-2 rounded-xl">
-                  <SelectValue placeholder="All Priorities" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priorities</SelectItem>
-                  {PRIORITY_OPTIONS.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <Select value={priority} onValueChange={setPriority}>
+              <SelectTrigger className="h-11 sm:h-12 border-2 rounded-xl text-sm [&[data-state=open]>svg]:rotate-180">
+                <SelectValue placeholder="All Priorities" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priorities</SelectItem>
+                {PRIORITY_OPTIONS.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-              <Select value={paid} onValueChange={setPaid}>
-                <SelectTrigger className="h-12 w-[140px] border-2 rounded-xl">
-                  <SelectValue placeholder="Payment" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Payments</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="unpaid">Unpaid</SelectItem>
-                </SelectContent>
-              </Select>
+            <Select value={paid} onValueChange={setPaid}>
+              <SelectTrigger className="h-11 sm:h-12 border-2 rounded-xl text-sm [&[data-state=open]>svg]:rotate-180">
+                <SelectValue placeholder="Payment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Payments</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="unpaid">Unpaid</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={staff} onValueChange={setStaff}>
+              <SelectTrigger className="h-11 sm:h-12 border-2 rounded-xl text-sm [&[data-state=open]>svg]:rotate-180">
+                <SelectValue placeholder="All Staff" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Staff</SelectItem>
+                {staffOptions.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="justify-start h-11 sm:h-12 font-normal flex-1 border-2 rounded-xl text-sm"
+                  >
+                    {fromDate ? format(fromDate, "dd MMM") : "From"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="p-2">
+                  <CalendarComponent
+                    mode="single"
+                    selected={fromDate}
+                    onSelect={setFromDate}
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="justify-start h-11 sm:h-12 font-normal flex-1 border-2 rounded-xl text-sm"
+                  >
+                    {toDate ? format(toDate, "dd MMM") : "To"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="p-2">
+                  <CalendarComponent
+                    mode="single"
+                    selected={toDate}
+                    onSelect={setToDate}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
-            {/* Row 2: Staff, Dates, Tags */}
-            <div className="flex items-center gap-4">
-              <Select value={staff} onValueChange={setStaff}>
-                <SelectTrigger className="h-12 w-[180px] border-2 rounded-xl">
-                  <SelectValue placeholder="All Staff" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Staff</SelectItem>
-                  {staffOptions.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <div className="flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="justify-start h-12 font-normal w-[140px] border-2 rounded-xl"
-                    >
-                      {fromDate ? format(fromDate, "dd MMM") : "From"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="p-2">
-                    <Calendar
-                      mode="single"
-                      selected={fromDate}
-                      onSelect={setFromDate}
-                    />
-                  </PopoverContent>
-                </Popover>
-
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="justify-start h-12 font-normal w-[140px] border-2 rounded-xl"
-                    >
-                      {toDate ? format(toDate, "dd MMM") : "To"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="p-2">
-                    <Calendar
-                      mode="single"
-                      selected={toDate}
-                      onSelect={setToDate}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <Input
-                className="h-12 w-[200px] border-2 rounded-xl"
-                placeholder="Tags: urgent, warranty..."
-                value={tagQuery}
-                onChange={(e) => setTagQuery(e.target.value)}
-              />
-            </div>
+            <Input
+              className="h-11 sm:h-12 border-2 rounded-xl text-sm"
+              placeholder="Tags: urgent, warranty..."
+              value={tagQuery}
+              onChange={(e) => setTagQuery(e.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
 
-      {/* Enhanced Diary Cards Grid - optimized for 1920px width */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+      {/* Results count and pagination info */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+        <div className="text-sm text-gray-600">
+          Showing {startIndex + 1}-{Math.min(endIndex, filtered.length)} of{" "}
+          {filtered.length} diaries
+        </div>
+
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="h-9 px-3 rounded-lg"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNum)}
+                    className="h-9 w-9 p-0 rounded-lg"
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setCurrentPage(Math.min(totalPages, currentPage + 1))
+              }
+              disabled={currentPage === totalPages}
+              className="h-9 px-3 rounded-lg"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Enhanced Diary Cards Grid - 2 columns with optimized content */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {loading &&
           Array.from({ length: 12 }).map((_, i) => (
             <div
               key={i}
-              className="animate-pulse bg-white border-0 rounded-3xl h-48 shadow-lg"
+              className="animate-pulse bg-white border-rounded rounded-2xl h-48 sm:h-52 shadow-lg"
             />
           ))}
 
         {!loading && filtered.length === 0 && (
-          <Card className="rounded-3xl border-0 shadow-lg col-span-full bg-gradient-to-r from-gray-50 to-gray-100">
-            <CardContent className="p-12 text-center">
+          <Card className="rounded-2xl border-rounded shadow-lg col-span-full bg-gradient-to-r from-gray-50 to-gray-100">
+            <CardContent className="p-8 sm:p-12 text-center">
               <div className="text-gray-400 mb-4">
-                <Search className="h-16 w-16 mx-auto" />
+                <Search className="h-12 w-12 sm:h-16 sm:w-16 mx-auto" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">
                 No diaries found
               </h3>
-              <p className="text-gray-500">
+              <p className="text-gray-500 text-sm sm:text-base">
                 No diaries match your current filters. Try adjusting your search
                 criteria, status, or date range.
               </p>
@@ -622,7 +706,7 @@ export default function DashboardPage() {
 
         <AnimatePresence>
           {!loading &&
-            filtered.map((d) => (
+            paginatedData.map((d) => (
               <motion.div
                 key={d.id}
                 variants={fadeIn}
@@ -632,55 +716,115 @@ export default function DashboardPage() {
                 whileHover={{ scale: 1.02 }}
                 transition={{ duration: 0.2 }}
               >
-                <Card className="rounded-3xl border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white group">
-                  <CardContent className="p-6">
+                <Card className="rounded-2xl border-rounded shadow-lg hover:shadow-xl transition-all duration-300 bg-white group h-full">
+                  <CardContent className="p-4 sm:p-6 h-full flex flex-col">
                     {/* Header with customer info and badges */}
-                    <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="flex items-start justify-between gap-3 mb-3 sm:mb-4">
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-lg text-gray-900 truncate mb-1">
+                        <div className="font-bold text-base sm:text-lg text-gray-900 truncate mb-1">
                           {d.customer?.name || "Customer"}
                         </div>
-                        <div className="text-sm text-gray-500 truncate">
-                          {d.customer?.email ||
-                            d.customer?.phone ||
-                            d.customer?.accountNo}
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500">
+                          {d.customer?.email && (
+                            <div className="flex items-center gap-1 truncate max-w-[120px] sm:max-w-[150px]">
+                              <Mail className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">
+                                {d.customer.email}
+                              </span>
+                            </div>
+                          )}
+                          {d.customer?.phone && (
+                            <div className="flex items-center gap-1 truncate max-w-[120px] sm:max-w-[150px]">
+                              <Phone className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">
+                                {d.customer.phone}
+                              </span>
+                            </div>
+                          )}
+                          {d.customer?.accountNo && (
+                            <div className="flex items-center gap-1 truncate max-w-[120px] sm:max-w-[150px]">
+                              <Hash className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">
+                                {d.customer.accountNo}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                         <StatusBadge status={d.status as Status} />
                         <PriorityBadge priority={d.priority as Priority} />
                       </div>
                     </div>
 
                     {/* Enquiry content */}
-                    <div className="text-sm text-gray-700 mb-4 line-clamp-3 leading-relaxed">
-                      {d.whatTheyWant || "No enquiry details provided"}
+                    <div className="text-sm text-gray-700 mb-3 sm:mb-4 line-clamp-3 leading-relaxed flex-1">
+                      {d.whatTheyWant
+                        ? truncateText(d.whatTheyWant, 100)
+                        : "No enquiry details provided"}
                     </div>
 
-                    {/* Meta information */}
-                    <div className="space-y-2 mb-4">
+                    {/* Meta information - compact layout */}
+                    <div className="space-y-2 mb-3 sm:mb-4">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Total:</span>
+                        <div className="flex items-center gap-1 text-gray-500">
+                          <DollarSign className="h-3 w-3" />
+                          <span>Total:</span>
+                        </div>
                         <span className="font-semibold text-gray-900">
                           ${String(d.total ?? 0)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Created:</span>
+                        <div className="flex items-center gap-1 text-gray-500">
+                          <Calendar className="h-3 w-3" />
+                          <span>Created:</span>
+                        </div>
                         <span className="text-gray-700">
                           {new Date(d.createdAt).toLocaleDateString()}
                         </span>
                       </div>
+                      {d.dueDate && (
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-1 text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>Due:</span>
+                          </div>
+                          <span
+                            className={cn(
+                              "text-gray-700",
+                              new Date(d.dueDate) < new Date() &&
+                                !["Collected", "Cancelled"].includes(d.status)
+                                ? "text-red-600 font-medium"
+                                : ""
+                            )}
+                          >
+                            {new Date(d.dueDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
                       {d.staff && (
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500">Staff:</span>
+                          <div className="flex items-center gap-1 text-gray-500">
+                            <User className="h-3 w-3" />
+                            <span>Created by:</span>
+                          </div>
                           <span className="text-gray-700">{d.staff}</span>
+                        </div>
+                      )}
+                      {d.assignedTo && (
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-1 text-gray-500">
+                            <User className="h-3 w-3" />
+                            <span>Assigned to:</span>
+                          </div>
+                          <span className="text-gray-700">{d.assignedTo}</span>
                         </div>
                       )}
                     </div>
 
                     {/* Actions row */}
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-between pt-3 sm:pt-4 border-t border-gray-100 mt-auto">
                       <div className="flex items-center gap-2">
                         <Select
                           value={d.status}
@@ -693,7 +837,7 @@ export default function DashboardPage() {
                               });
                               if (res.ok) {
                                 // Update local state immediately for better UX
-                                setRows((prev) =>
+                                setActiveRows((prev) =>
                                   prev
                                     ? prev.map((row) =>
                                         row.id === d.id
@@ -713,7 +857,7 @@ export default function DashboardPage() {
                             }
                           }}
                         >
-                          <SelectTrigger className="h-10 w-40 border-2 rounded-xl">
+                          <SelectTrigger className="h-9 w-32 sm:w-40 border-2 rounded-xl text-xs sm:text-sm [&[data-state=open]>svg]:rotate-180">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -731,7 +875,7 @@ export default function DashboardPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-10 px-4 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 hover:scale-105 transition-all duration-300 rounded-xl font-medium"
+                            className="h-9 px-3 sm:px-4 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 hover:scale-105 transition-all duration-300 rounded-xl font-medium text-xs sm:text-sm"
                           >
                             View
                           </Button>
@@ -739,7 +883,7 @@ export default function DashboardPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-10 w-10 p-0 bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 hover:border-amber-300 hover:scale-105 transition-all duration-300 rounded-xl"
+                          className="h-9 w-9 p-0 bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 hover:border-amber-300 hover:scale-105 transition-all duration-300 rounded-xl"
                           onClick={async () => {
                             const res = await fetch(`/api/diaries/${d.id}`, {
                               method: "PATCH",

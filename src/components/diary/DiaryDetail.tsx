@@ -171,7 +171,7 @@ export default function DiaryDetail({ id }: { id: string }) {
       storeLocation: data.storeLocation ?? "",
       tags: data.tags ?? "",
       // Total amount
-      total: data.total ?? "",
+      total: data.total ?? "0",
       // Staff assignment
       assignedTo: data.assignedTo ?? null,
       // Order fields
@@ -229,7 +229,7 @@ export default function DiaryDetail({ id }: { id: string }) {
       storeLocation: data.storeLocation ?? "",
       tags: data.tags ?? "",
       // Total amount
-      total: data.total ?? "",
+      total: data.total ?? "0",
       // Staff assignment
       assignedTo: data.assignedTo ?? null,
       // Order fields
@@ -473,7 +473,7 @@ export default function DiaryDetail({ id }: { id: string }) {
               </Button>
               <Button
                 onClick={doSave}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl hover:scale-105 transition-all duration-300"
               >
                 Save
               </Button>
@@ -487,7 +487,7 @@ export default function DiaryDetail({ id }: { id: string }) {
       <Tabs
         defaultValue="summary"
         className="mt-4"
-        onValueChange={async (value) => {
+        onValueChange={async () => {
           // Auto-save when switching tabs if there are unsaved changes
           if (dirty) {
             await doSave();
@@ -506,7 +506,7 @@ export default function DiaryDetail({ id }: { id: string }) {
         <TabsContent value="summary" className="space-y-4">
           {/* Customer Information */}
           {data.customer && (
-            <Card className="rounded-2xl border shadow-sm">
+            <Card className="rounded-2xl border-rounded shadow-lg bg-white">
               <CardHeader>
                 <CardTitle>Customer Information</CardTitle>
                 <CardDescription>
@@ -547,7 +547,7 @@ export default function DiaryDetail({ id }: { id: string }) {
           )}
 
           {/* Status & Flags */}
-          <Card className="rounded-2xl border shadow-sm">
+          <Card className="rounded-2xl border-rounded shadow-lg bg-white">
             <CardHeader>
               <CardTitle>Status & Flags</CardTitle>
               <CardDescription>
@@ -711,7 +711,7 @@ export default function DiaryDetail({ id }: { id: string }) {
           </Card>
 
           {/* Request & Notes */}
-          <Card className="rounded-2xl border shadow-sm">
+          <Card className="rounded-2xl border-rounded shadow-lg bg-white">
             <CardHeader>
               <CardTitle>Request & Notes</CardTitle>
               <CardDescription>
@@ -743,7 +743,7 @@ export default function DiaryDetail({ id }: { id: string }) {
           </Card>
 
           {/* Payment */}
-          <Card className="rounded-2xl border shadow-sm">
+          <Card className="rounded-2xl border-rounded shadow-lg bg-white">
             <CardHeader>
               <CardTitle>Payment</CardTitle>
               <CardDescription>
@@ -854,7 +854,7 @@ export default function DiaryDetail({ id }: { id: string }) {
 
         {/* ORDER DETAILS */}
         <TabsContent value="order">
-          <Card className="rounded-2xl border shadow-sm">
+          <Card className="rounded-2xl border-rounded shadow-lg bg-white">
             <CardHeader>
               <CardTitle>Order Information</CardTitle>
               <CardDescription>
@@ -953,7 +953,7 @@ export default function DiaryDetail({ id }: { id: string }) {
             </Button>
             <Button
               onClick={doSave}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl hover:scale-105 transition-all duration-300"
             >
               Save
             </Button>
@@ -974,7 +974,7 @@ export default function DiaryDetail({ id }: { id: string }) {
           <AlertDialogFooter>
             <AlertDialogCancel>Stay</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 rounded-xl"
               onClick={() => {
                 setShowLeaveConfirm(false);
                 const go = pendingNavRef.current;

@@ -1,0 +1,1 @@
+ALTER TABLE "diary_followups" ALTER COLUMN "staff_code" DROP NOT NULL;

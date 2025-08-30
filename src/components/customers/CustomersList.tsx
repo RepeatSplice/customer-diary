@@ -9,6 +9,7 @@ import { Search, Filter, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectTrigger,
@@ -282,9 +283,17 @@ export default function CustomersList() {
   }
 
   return (
-    <div className="w-full px-6 pb-12">
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Customers</h1>
+    <div className="w-full px-4 sm:px-6 lg:px-8 pb-12 max-w-[1400px] mx-auto">
+      {/* Header with better spacing for wide screens */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
+            Customers
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Manage customer information and track their diary history
+          </p>
+        </div>
       </div>
 
       {error && (
@@ -317,264 +326,275 @@ export default function CustomersList() {
         </div>
       )}
 
-      {/* Filter/search bar */}
-      <div className="rounded-2xl border shadow-sm bg-white p-4 mb-5">
-        {/* Row 1: search + quick filters to the right */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[280px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-9 w-full"
-              placeholder="Search name / email / phone / account #"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <Select value={staff} onValueChange={setStaff}>
-            <SelectTrigger className="h-10 w-[160px]">
-              <SelectValue placeholder="Staff" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Staff: All</SelectItem>
-              {staffOptions.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Row 2: dates + tags + toggles */}
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Label className="text-xs">From</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="justify-start h-10 font-normal w-[160px]"
-                >
-                  {fromDate ? format(fromDate, "dd MMM yyyy") : "Pick a date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="p-2">
-                <Calendar
-                  mode="single"
-                  selected={fromDate}
-                  onSelect={setFromDate}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Label className="text-xs">To</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="justify-start h-10 font-normal w-[160px]"
-                >
-                  {toDate ? format(toDate, "dd MMM yyyy") : "Pick a date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="p-2">
-                <Calendar
-                  mode="single"
-                  selected={toDate}
-                  onSelect={setToDate}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <Input
-            className="w-[260px]"
-            placeholder="Tags e.g. vip, warranty"
-            value={tagQuery}
-            onChange={(e) => setTagQuery(e.target.value)}
-          />
-
-          <Button
-            type="button"
-            variant={onlyHasActive ? "default" : "outline"}
-            className={cn(
-              "h-10",
-              onlyHasActive && "bg-green-600 hover:bg-green-700"
-            )}
-            onClick={() => setOnlyHasActive((v) => !v)}
-          >
-            <Filter className="h-4 w-4 mr-2" />{" "}
-            {onlyHasActive ? "Has active" : "Filter: active"}
-          </Button>
-
-          <Button
-            type="button"
-            variant={onlyHasOverdue ? "default" : "outline"}
-            className={cn(
-              "h-10",
-              onlyHasOverdue && "bg-green-600 hover:bg-green-700"
-            )}
-            onClick={() => setOnlyHasOverdue((v) => !v)}
-          >
-            <Filter className="h-4 w-4 mr-2" />{" "}
-            {onlyHasOverdue ? "Has overdue" : "Filter: overdue"}
-          </Button>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="overflow-hidden rounded-2xl border shadow-sm bg-white">
-        <div className="grid grid-cols-12 px-4 py-3 text-xs font-medium text-muted-foreground">
-          <div className="col-span-3">Customer</div>
-          <div className="col-span-2">Email</div>
-          <div className="col-span-2">Phone</div>
-          <div className="col-span-1">Account #</div>
-          <div className="col-span-1 text-center">Diaries</div>
-          <div className="col-span-1 text-center">Active</div>
-          <div className="col-span-1">Last activity</div>
-          <div className="col-span-1 text-right">Actions</div>
-        </div>
-        <div className="h-px bg-border" />
-
-        {/* Rows */}
-        <AnimatePresence>
-          {loading && (
-            <div className="p-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="animate-pulse h-14 bg-muted/40 rounded-xl mb-2"
-                />
-              ))}
+      {/* Enhanced Filter/Search Section - optimized for smaller screens */}
+      <Card className="rounded-2xl border-rounded shadow-lg mb-6 sm:mb-8 bg-gradient-to-r from-gray-50 to-gray-100">
+        <CardContent className="p-4 sm:p-6">
+          {/* Row 1: search + quick filters to the right */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[280px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-9 w-full"
+                placeholder="Search name / email / phone / account #"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
-          )}
 
-          {!loading && pageItems.length === 0 && (
-            <motion.div
-              variants={fade}
-              initial="hidden"
-              animate="show"
-              className="p-12 text-center text-muted-foreground"
+            <Select value={staff} onValueChange={setStaff}>
+              <SelectTrigger className="h-10 w-[160px]">
+                <SelectValue placeholder="Staff" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Staff: All</SelectItem>
+                {staffOptions.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Row 2: dates + tags + toggles */}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs">From</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="justify-start h-10 font-normal w-[160px]"
+                  >
+                    {fromDate ? format(fromDate, "dd MMM yyyy") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="p-2">
+                  <Calendar
+                    mode="single"
+                    selected={fromDate}
+                    onSelect={setFromDate}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Label className="text-xs">To</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="justify-start h-10 font-normal w-[160px]"
+                  >
+                    {toDate ? format(toDate, "dd MMM yyyy") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="p-2">
+                  <Calendar
+                    mode="single"
+                    selected={toDate}
+                    onSelect={setToDate}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <Input
+              className="w-[260px]"
+              placeholder="Tags e.g. vip, warranty"
+              value={tagQuery}
+              onChange={(e) => setTagQuery(e.target.value)}
+            />
+
+            <Button
+              type="button"
+              variant={onlyHasActive ? "default" : "outline"}
+              className={cn(
+                "h-10",
+                onlyHasActive && "bg-green-600 hover:bg-green-700"
+              )}
+              onClick={() => setOnlyHasActive((v) => !v)}
             >
-              No customers match your filters.{" "}
-              <Button
-                variant="link"
-                onClick={() => {
-                  setSearch("");
-                  setStaff("all");
-                  setFromDate(undefined);
-                  setToDate(undefined);
-                  setTagQuery("");
-                  setOnlyHasActive(false);
-                  setOnlyHasOverdue(false);
-                }}
-              >
-                Clear filters
-              </Button>
-            </motion.div>
-          )}
+              <Filter className="h-4 w-4 mr-2" />{" "}
+              {onlyHasActive ? "Has active" : "Filter: active"}
+            </Button>
 
-          {!loading &&
-            pageItems.map((c) => (
+            <Button
+              type="button"
+              variant={onlyHasOverdue ? "default" : "outline"}
+              className={cn(
+                "h-10",
+                onlyHasOverdue && "bg-green-600 hover:bg-green-700"
+              )}
+              onClick={() => setOnlyHasOverdue((v) => !v)}
+            >
+              <Filter className="h-4 w-4 mr-2" />{" "}
+              {onlyHasOverdue ? "Has overdue" : "Filter: overdue"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Enhanced Table - matching dashboard styling */}
+      <Card className="rounded-2xl border-rounded shadow-lg bg-white">
+        <CardContent className="p-0">
+          <div className="grid grid-cols-12 px-4 py-3 text-xs font-medium text-muted-foreground">
+            <div className="col-span-3">Customer</div>
+            <div className="col-span-2">Email</div>
+            <div className="col-span-2">Phone</div>
+            <div className="col-span-1">Account #</div>
+            <div className="col-span-1 text-center">Diaries</div>
+            <div className="col-span-1 text-center">Active</div>
+            <div className="col-span-1">Last activity</div>
+            <div className="col-span-1 text-right">Actions</div>
+          </div>
+          <div className="h-px bg-border" />
+
+          {/* Rows */}
+          <AnimatePresence>
+            {loading && (
+              <div className="p-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="animate-pulse h-14 bg-muted/40 rounded-xl mb-2"
+                  />
+                ))}
+              </div>
+            )}
+
+            {!loading && pageItems.length === 0 && (
               <motion.div
-                key={c.id}
                 variants={fade}
                 initial="hidden"
                 animate="show"
-                exit={{ opacity: 0 }}
-                className="grid grid-cols-12 px-4 py-4 items-center hover:bg-muted/30"
+                className="p-12 text-center text-muted-foreground"
               >
-                <div className="col-span-3">
-                  <div className="font-medium">{c.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {c.createdAt
-                      ? `Created ${new Date(c.createdAt).toLocaleDateString()}`
-                      : null}
-                  </div>
-                </div>
-                <div className="col-span-2 truncate">{c.email}</div>
-                <div className="col-span-2 truncate">{c.phone}</div>
-                <div className="col-span-1 truncate">{c.accountNo}</div>
-                <div className="col-span-1 text-center">
-                  {c.diariesTotal ?? 0}
-                </div>
-                <div className="col-span-1 text-center">
-                  {c.activeTotal ?? 0}
-                </div>
-                <div className="col-span-1 truncate">
-                  {c.lastActivityAt
-                    ? format(new Date(c.lastActivityAt), "dd MMM yyyy")
-                    : "—"}
-                </div>
-                <div className="col-span-1 flex justify-end">
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="destructive" className="gap-1">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete customer?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently delete the customer and related
-                          diaries. This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-red-600 hover:bg-red-700"
-                          onClick={() => deleteCustomer(c.id)}
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+                No customers match your filters.{" "}
+                <Button
+                  variant="link"
+                  onClick={() => {
+                    setSearch("");
+                    setStaff("all");
+                    setFromDate(undefined);
+                    setToDate(undefined);
+                    setTagQuery("");
+                    setOnlyHasActive(false);
+                    setOnlyHasOverdue(false);
+                  }}
+                >
+                  Clear filters
+                </Button>
               </motion.div>
-            ))}
-        </AnimatePresence>
+            )}
 
-        {/* Footer / pagination */}
-        {!loading && filtered.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/30">
-            <div className="text-xs text-muted-foreground">
-              Showing{" "}
-              <span className="font-medium">{(page - 1) * pageSize + 1}</span>–
-              <span className="font-medium">
-                {Math.min(page * pageSize, filtered.length)}
-              </span>{" "}
-              of {filtered.length}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={page === 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Prev
-              </Button>
-              <div className="text-xs">
-                Page {page} / {totalPages}
+            {!loading &&
+              pageItems.map((c) => (
+                <motion.div
+                  key={c.id}
+                  variants={fade}
+                  initial="hidden"
+                  animate="show"
+                  exit={{ opacity: 0 }}
+                  className="grid grid-cols-12 px-4 py-4 items-center hover:bg-muted/30"
+                >
+                  <div className="col-span-3">
+                    <div className="font-medium">{c.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {c.createdAt
+                        ? `Created ${new Date(
+                            c.createdAt
+                          ).toLocaleDateString()}`
+                        : null}
+                    </div>
+                  </div>
+                  <div className="col-span-2 truncate">{c.email}</div>
+                  <div className="col-span-2 truncate">{c.phone}</div>
+                  <div className="col-span-1 truncate">{c.accountNo}</div>
+                  <div className="col-span-1 text-center">
+                    {c.diariesTotal ?? 0}
+                  </div>
+                  <div className="col-span-1 text-center">
+                    {c.activeTotal ?? 0}
+                  </div>
+                  <div className="col-span-1 truncate">
+                    {c.lastActivityAt
+                      ? format(new Date(c.lastActivityAt), "dd MMM yyyy")
+                      : "—"}
+                  </div>
+                  <div className="col-span-1 flex justify-end">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-9 w-9 p-0 bg-red-50 border-red-200 text-red-700 hover:bg-red-100 hover:border-red-300 hover:scale-105 transition-all duration-300 rounded-xl"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete customer?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete the customer and
+                            related diaries. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={() => deleteCustomer(c.id)}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </motion.div>
+              ))}
+          </AnimatePresence>
+
+          {/* Footer / pagination */}
+          {!loading && filtered.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/30">
+              <div className="text-xs text-muted-foreground">
+                Showing{" "}
+                <span className="font-medium">{(page - 1) * pageSize + 1}</span>
+                –
+                <span className="font-medium">
+                  {Math.min(page * pageSize, filtered.length)}
+                </span>{" "}
+                of {filtered.length}
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={page === totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Next
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Prev
+                </Button>
+                <div className="text-xs">
+                  Page {page} / {totalPages}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

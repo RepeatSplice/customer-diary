@@ -176,7 +176,7 @@ export const diaryFollowups = pgTable(
       .references(() => customerDiary.id, { onDelete: "cascade" }),
     entryType: followup_type("entry_type").notNull().default("note"),
     message: text("message").notNull(),
-    staffCode: text("staff_code").notNull(),
+    staffCode: text("staff_code"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

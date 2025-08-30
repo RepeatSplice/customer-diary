@@ -29,6 +29,13 @@
       "when": 1756176414468,
       "tag": "0003_typical_epoch",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1756367223854,
+      "tag": "0004_dear_maverick",
+      "breakpoints": true
     }
   ]
 }
