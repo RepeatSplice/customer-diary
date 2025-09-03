@@ -20,7 +20,7 @@ export default function Toaster({
   gap = 10,
   closeOnAction = true,
 }: ToasterProps) {
-  const { toasts, dismiss, remove } = useToast();
+  const { toasts, dismiss } = useToast();
 
   const posClass =
     position === "top-right"
@@ -39,10 +39,9 @@ export default function Toaster({
       style={{ gap }}
     >
       <AnimatePresence initial={false}>
-        {toasts.map((t) => {
-          const handleExit = () => remove(t.id);
-
-          return (
+        {toasts
+          .filter((t) => !t.dismissed)
+          .map((t) => (
             <motion.div
               key={t.id}
               layout
@@ -55,7 +54,6 @@ export default function Toaster({
                 damping: 32,
                 opacity: { duration: 0.15 },
               }}
-              onAnimationComplete={t.dismissed ? handleExit : undefined}
               role={t.variant === "destructive" ? "alert" : "status"}
               className={cn(
                 "pointer-events-auto w-[360px] max-w-[90vw] rounded-xl border shadow-md backdrop-blur bg-white relative",
@@ -137,8 +135,7 @@ export default function Toaster({
                 </button>
               </div>
             </motion.div>
-          );
-        })}
+          ))}
       </AnimatePresence>
     </div>
   );

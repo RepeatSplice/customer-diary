@@ -15,5 +15,9 @@ export function StatusBadge({ status }: { status: string }) {
     Cancelled: "bg-red-200 text-red-900",
   };
   const cls = map[status as Status] ?? "bg-gray-200 text-gray-900";
-  return <Badge className={cls}>{status}</Badge>;
+  return (
+    <Badge className={`h-9 px-3 text-sm rounded-full border ${cls}`}>
+      {status}
+    </Badge>
+  );
 }

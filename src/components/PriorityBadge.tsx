@@ -9,5 +9,9 @@ export function PriorityBadge({ priority }: { priority: string }) {
     Urgent: "bg-rose-200 text-rose-900",
   };
   const cls = map[priority as Priority] ?? "bg-neutral-200 text-neutral-900";
-  return <Badge className={cls}>{priority}</Badge>;
+  return (
+    <Badge className={`h-9 px-3 text-sm rounded-full border ${cls}`}>
+      {priority}
+    </Badge>
+  );
 }

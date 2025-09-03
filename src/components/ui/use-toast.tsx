@@ -100,7 +100,7 @@ export function ToastProvider({
       if (t.dismissed) continue;
       if (map.has(t.id)) continue;
 
-      const duration = t.duration ?? 3500;
+      const duration = t.duration ?? 2500;
       const timer = window.setTimeout(() => {
         setToasts((prev) =>
           prev.map((x) => (x.id === t.id ? { ...x, dismissed: true } : x))
@@ -120,12 +120,16 @@ export function ToastProvider({
     const add: ToastAPI["add"] = (opts) => {
       const id = opts.id ?? crypto.randomUUID();
       setToasts((prev) => {
+        const defaultDuration =
+          opts.duration ?? (opts.variant === "destructive" ? 5000 : 2500);
+        // Cap excessive durations so toasts clear in a timely manner
+        const computedDuration = Math.min(defaultDuration, 6000);
         const next: ToastItem = {
           id,
           title: opts.title,
           description: opts.description,
           variant: opts.variant ?? "default",
-          duration: opts.duration ?? 10000, // 10 seconds default
+          duration: computedDuration,
           action: opts.action,
           createdAt: Date.now(),
         };

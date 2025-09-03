@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   MessageSquareText,
   Phone,
@@ -10,11 +11,11 @@ import {
   Pin,
   Edit3,
   Trash2,
-  Check,
   X,
   Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DiarySaveButton } from "@/components/diary/SaveButton";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -93,6 +94,14 @@ export function Followups({
     )
   );
   const [pinned, setPinned] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+
+  // Draft persistence for composer
+  const draftKey = useMemo(
+    () => ["followups-draft", diaryId] as const,
+    [diaryId]
+  );
+  const initFromDraft = useRef(false);
 
   // Staff data
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
@@ -114,6 +123,22 @@ export function Followups({
 
   // delete confirm
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Initialize from persisted draft
+  useEffect(() => {
+    if (initFromDraft.current) return;
+    const draft = queryClient.getQueryData<{
+      text: string;
+      type: Follow["entryType"];
+      staff: string;
+    }>(draftKey);
+    if (draft) {
+      setText(draft.text || "");
+      setType(draft.type || "note");
+      setStaff(draft.staff || "none");
+    }
+    initFromDraft.current = true;
+  }, [draftKey, queryClient]);
 
   // Fetch staff members on component mount
   useEffect(() => {
@@ -142,22 +167,25 @@ export function Followups({
     return [...pinnedArr, ...rest];
   }, [items, pinned]);
 
-  // --- API calls ---
-  async function add() {
-    if (!text.trim()) return;
-    const res = await fetch(`/api/diaries/${diaryId}/followups`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        entryType: type,
-        message: text.trim(),
-        staffCode: staff === "none" ? undefined : staff,
-      }),
-    });
-    if (res.ok) {
-      const f: Follow = await res.json();
+  // --- TanStack Query Mutations ---
+  const addMutation = useMutation({
+    mutationKey: ["followups-add", diaryId],
+    mutationFn: async (data: {
+      entryType: Follow["entryType"];
+      message: string;
+      staffCode?: string;
+    }) => {
+      const res = await fetch(`/api/diaries/${diaryId}/followups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return (await res.json()) as Follow;
+    },
+    onSuccess: (newFollow) => {
       setItems((prev) =>
-        [f, ...prev].sort(
+        [newFollow, ...prev].sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
@@ -166,80 +194,156 @@ export function Followups({
       setNextAction(undefined);
       setType("note");
       setStaff("none");
-      // rule: if SMS, flip Texted flag
-      if (type === "sms") {
-        await fetch(`/api/diaries/${diaryId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hasTextedCustomer: true }),
-        });
-      }
-      toast({ title: "Follow-up added", duration: 15000 });
-    } else {
-      toast({
-        title: "Failed to add follow-up",
-        variant: "destructive",
-        duration: 15000,
+
+      // Clear draft after successful add
+      queryClient.removeQueries({ queryKey: draftKey });
+
+      // Optimistically update diary cache and invalidate
+      queryClient.setQueryData(["diary", diaryId], (old: unknown) => {
+        if (!old || typeof old !== "object") return old;
+        const current = old as { followups?: Follow[] } & Record<
+          string,
+          unknown
+        >;
+        const updated = [newFollow, ...(current.followups || [])];
+        return { ...current, followups: updated };
       });
+      queryClient.invalidateQueries({ queryKey: ["diary", diaryId] });
+
+      // SMS special handling
+      if (newFollow.entryType === "sms") {
+        updateDiaryField({ hasTextedCustomer: true });
+      }
+
+      toast({ title: "Follow-up added" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add follow-up", variant: "destructive" });
+    },
+  });
+
+  const updateDiaryField = async (data: Record<string, unknown>) => {
+    try {
+      await fetch(`/api/diaries/${diaryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      console.error("Failed to update diary field:", error);
     }
+  };
+
+  async function add() {
+    if (!text.trim()) return;
+    addMutation.mutate({
+      entryType: type,
+      message: text.trim(),
+      staffCode: staff === "none" ? undefined : staff,
+    });
   }
 
-  async function saveEdit() {
-    if (!editing) return;
-    const { id, message, entryType, staffCode } = editing;
-
-    const res = await fetch(`/api/diaries/${diaryId}/followups`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id,
-        message: message.trim(),
-        entryType,
-        staffCode,
-      }),
-    });
-
-    if (res.ok) {
+  const editMutation = useMutation({
+    mutationKey: ["followups-edit", diaryId],
+    mutationFn: async (data: {
+      id: string;
+      message: string;
+      entryType: Follow["entryType"];
+      staffCode?: string | null;
+    }) => {
+      const res = await fetch(`/api/diaries/${diaryId}/followups`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: data.id,
+          message: data.message.trim(),
+          entryType: data.entryType,
+          staffCode: data.staffCode,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return data;
+    },
+    onSuccess: ({ id, message, entryType, staffCode }) => {
       setItems((prev) =>
         prev.map((f) =>
           f.id === id ? { ...f, message, entryType, staffCode } : f
         )
       );
       setEditing(null);
-      toast({ title: "Follow-up updated", duration: 15000 });
-    } else {
-      toast({
-        title: "Failed to update follow-up",
-        variant: "destructive",
-        duration: 15000,
+
+      // Update diary cache
+      queryClient.setQueryData(["diary", diaryId], (old: unknown) => {
+        if (!old || typeof old !== "object") return old;
+        const current = old as { followups?: Follow[] } & Record<
+          string,
+          unknown
+        >;
+        const updated = (current.followups || []).map((f) =>
+          f.id === id ? { ...f, message, entryType, staffCode } : f
+        );
+        return { ...current, followups: updated };
       });
-    }
+      queryClient.invalidateQueries({ queryKey: ["diary", diaryId] });
+
+      toast({ title: "Follow-up updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update follow-up", variant: "destructive" });
+    },
+  });
+
+  async function saveEdit() {
+    if (!editing) return;
+    const { id, message, entryType, staffCode } = editing;
+    editMutation.mutate({ id, message, entryType, staffCode });
   }
+
+  const deleteMutation = useMutation({
+    mutationKey: ["followups-delete", diaryId],
+    mutationFn: async (id: string) => {
+      const res = await fetch(
+        `/api/diaries/${diaryId}/followups?id=${encodeURIComponent(id)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      return id;
+    },
+    onMutate: async (id: string) => {
+      // Optimistic update
+      const previousItems = items;
+      setItems((prev) => prev.filter((f) => f.id !== id));
+      return { previousItems };
+    },
+    onSuccess: (id: string) => {
+      // Update diary cache
+      queryClient.setQueryData(["diary", diaryId], (old: unknown) => {
+        if (!old || typeof old !== "object") return old;
+        const current = old as { followups?: Follow[] } & Record<
+          string,
+          unknown
+        >;
+        const filtered = (current.followups || []).filter((f) => f.id !== id);
+        return { ...current, followups: filtered };
+      });
+      queryClient.invalidateQueries({ queryKey: ["diary", diaryId] });
+
+      toast({ title: "Follow-up deleted" });
+    },
+    onError: (error, id, context) => {
+      // Revert optimistic update
+      if (context?.previousItems) {
+        setItems(context.previousItems);
+      }
+      toast({ title: "Failed to delete", variant: "destructive" });
+    },
+  });
 
   async function deleteNow() {
     if (!deleteId) return;
     const id = deleteId;
     setDeleteId(null);
-
-    // optimistic
-    const prev = items;
-    setItems((p) => p.filter((f) => f.id !== id));
-    try {
-      const res = await fetch(
-        `/api/diaries/${diaryId}/followups?id=${encodeURIComponent(id)}`,
-        { method: "DELETE" }
-      );
-      if (!res.ok) throw new Error("delete failed");
-      toast({ title: "Follow-up deleted", duration: 15000 });
-    } catch {
-      // revert
-      setItems(prev);
-      toast({
-        title: "Failed to delete",
-        variant: "destructive",
-        duration: 15000,
-      });
-    }
+    deleteMutation.mutate(id);
   }
 
   function togglePin(id: string) {
@@ -253,6 +357,12 @@ export function Followups({
 
   // --- UI helpers ---
   const isEditing = (id: string) => editing?.id === id;
+
+  // Persist draft when form changes
+  useEffect(() => {
+    if (!initFromDraft.current) return;
+    queryClient.setQueryData(draftKey, { text, type, staff });
+  }, [text, type, staff, draftKey, queryClient]);
 
   return (
     <div className="grid md:grid-cols-[1fr_360px] gap-6">
@@ -422,14 +532,13 @@ export function Followups({
                       <X className="h-3.5 w-3.5" />
                       Cancel
                     </Button>
-                    <Button
-                      size="sm"
+                    <DiarySaveButton
                       onClick={saveEdit}
-                      className="bg-green-600 hover:bg-green-700 text-white gap-1"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      Save
-                    </Button>
+                      className="h-9 px-3 text-sm"
+                      label="Save"
+                      isSaving={editMutation.isPending}
+                      disabled={editMutation.isPending}
+                    />
                   </div>
                 </div>
               )}
@@ -534,12 +643,12 @@ export function Followups({
             </Popover>
           </div>
           <div className="flex justify-end">
-            <Button
+            <DiarySaveButton
               onClick={add}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              Add follow-up
-            </Button>
+              label="Add follow-up"
+              isSaving={addMutation.isPending}
+              disabled={addMutation.isPending || !text.trim()}
+            />
           </div>
         </CardContent>
       </Card>

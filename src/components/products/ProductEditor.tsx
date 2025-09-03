@@ -4,17 +4,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Trash } from "lucide-react";
 
 export function ProductEditor({
   value,
   onChange,
+  disabled = false,
 }: {
   value: any[];
   onChange: (v: any[]) => void;
+  disabled?: boolean;
 }) {
   const [rows, setRows] = useState<any[]>(value || []);
+
+  // Keep editor in sync with external value changes
+  useEffect(() => {
+    setRows(value || []);
+  }, [value]);
   function add() {
     const v = [...rows, { upc: "", name: "", qty: 1, unitPrice: 0 }];
     setRows(v);
@@ -40,7 +47,12 @@ export function ProductEditor({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-semibold">Products</CardTitle>
-        <Button variant="secondary" onClick={add} className="gap-2">
+        <Button
+          variant="secondary"
+          onClick={add}
+          className="gap-2"
+          disabled={disabled}
+        >
           <Plus className="h-4 w-4" /> Add
         </Button>
       </CardHeader>
@@ -55,6 +67,7 @@ export function ProductEditor({
               <Input
                 value={r.upc}
                 onChange={(e) => set(i, "upc", e.target.value)}
+                disabled={disabled}
               />
             </div>
             <div>
@@ -62,6 +75,7 @@ export function ProductEditor({
               <Input
                 value={r.name}
                 onChange={(e) => set(i, "name", e.target.value)}
+                disabled={disabled}
               />
             </div>
             <div>
@@ -70,6 +84,7 @@ export function ProductEditor({
                 type="number"
                 value={r.qty}
                 onChange={(e) => set(i, "qty", Number(e.target.value))}
+                disabled={disabled}
               />
             </div>
             <div>
@@ -78,9 +93,15 @@ export function ProductEditor({
                 type="number"
                 value={r.unitPrice}
                 onChange={(e) => set(i, "unitPrice", Number(e.target.value))}
+                disabled={disabled}
               />
             </div>
-            <Button variant="ghost" size="icon" onClick={() => remove(i)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => remove(i)}
+              disabled={disabled}
+            >
               <Trash className="h-4 w-4" />
             </Button>
           </div>

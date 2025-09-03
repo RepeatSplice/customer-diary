@@ -1,5 +1,6 @@
 "use client";
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   UploadCloud,
   ExternalLink,
@@ -30,12 +31,46 @@ export function Attachments({
 }) {
   const [files, setFiles] = useState<Attachment[]>(initial);
   const [dragActive, setDragActive] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Derived busy state from mutations
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
 
   const remaining = Math.max(0, 3 - files.length);
   const canAddMore = remaining > 0;
+
+  const draftKey = useMemo(
+    () => ["diary-attachments-draft", diaryId] as const,
+    [diaryId]
+  );
+  const initializedFromDraft = useRef(false);
+
+  // Initialize from persisted draft once (survive tab switches until server confirms)
+  useEffect(() => {
+    if (initializedFromDraft.current) return;
+    const draft = queryClient.getQueryData<Attachment[]>(draftKey);
+    if (draft && Array.isArray(draft) && draft.length) {
+      setFiles(draft);
+    }
+    initializedFromDraft.current = true;
+  }, [draftKey, queryClient]);
+
+  // Merge local files with parent props (avoid losing freshly uploaded items)
+  useEffect(() => {
+    setFiles((prev) => {
+      const order = [...prev, ...initial];
+      const seen = new Set<string>();
+      const merged: Attachment[] = [];
+      for (const a of order) {
+        if (!a || !a.id) continue;
+        if (!seen.has(a.id)) {
+          seen.add(a.id);
+          merged.push(a);
+        }
+      }
+      return merged.slice(0, 3);
+    });
+  }, [initial]);
 
   // Load image URLs for previews
   const loadImageUrl = useCallback(async (id: string) => {
@@ -69,8 +104,9 @@ export function Attachments({
     loadImageUrls();
   }, [loadImageUrls]);
 
-  const uploadOne = useCallback(
-    async (file: File) => {
+  const uploadMutation = useMutation({
+    mutationKey: ["attachments-upload", diaryId],
+    mutationFn: async (file: File) => {
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch(`/api/diaries/${diaryId}/attachments`, {
@@ -78,28 +114,69 @@ export function Attachments({
         body: fd,
       });
       if (!res.ok) throw new Error(await res.text());
-      const row: Attachment = await res.json();
-      setFiles((prev) => [row, ...prev].slice(0, 3));
+      return (await res.json()) as Attachment;
     },
-    [diaryId]
-  );
+    onSuccess: (row: Attachment) => {
+      setFiles((prev) => {
+        const next = [row, ...prev].slice(0, 3);
+        return next;
+      });
+      // Optimistically update cached diary attachments so other tabs/parent reflect immediately
+      queryClient.setQueryData(["diary", diaryId], (old: unknown) => {
+        if (!old || typeof old !== "object") return old;
+        const current = old as { attachments?: Attachment[] } & Record<
+          string,
+          unknown
+        >;
+        const nextList = [row, ...(current.attachments || [])];
+        const dedup = nextList.filter(
+          (v, i, arr) => arr.findIndex((x) => x.id === v.id) === i
+        );
+        return { ...current, attachments: dedup.slice(0, 3) };
+      });
+      // Persist draft so newly added files remain visible across tab switches
+      queryClient.setQueryData(
+        ["diary-attachments-draft", diaryId],
+        (prev: unknown) => {
+          const current = Array.isArray(prev) ? (prev as Attachment[]) : [];
+          const next = [row as Attachment, ...current];
+          const dedup = next.filter(
+            (v, i, arr) => arr.findIndex((x) => x.id === v.id) === i
+          );
+          return dedup.slice(0, 3);
+        }
+      );
+    },
+  });
 
   const handleFiles = async (list: FileList | null) => {
     if (!list || list.length === 0 || !canAddMore) return;
-    setBusy(true);
     try {
       const toUpload = Array.from(list).slice(0, remaining);
       for (const f of toUpload) {
         // accept only images/pdf
         if (!/^image\/|^application\/pdf$/.test(f.type)) continue;
-        await uploadOne(f);
+        const row = await uploadMutation.mutateAsync(f);
+        // Update draft after each successful upload to survive tab switch before invalidate completes
+        queryClient.setQueryData(
+          ["diary-attachments-draft", diaryId],
+          (prev: unknown) => {
+            const current = Array.isArray(prev) ? (prev as Attachment[]) : [];
+            const next = [row as Attachment, ...current];
+            const dedup = next.filter(
+              (v, i, arr) => arr.findIndex((x) => x.id === v.id) === i
+            );
+            return dedup.slice(0, 3);
+          }
+        );
       }
       toast({ title: "Upload complete" });
+      // Invalidate diary so persisted cache and other tabs refresh
+      queryClient.invalidateQueries({ queryKey: ["diary", diaryId] });
     } catch (e) {
       console.error(e);
       toast({ title: "Upload failed", variant: "destructive" });
     } finally {
-      setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
     }
   };
@@ -149,25 +226,47 @@ export function Attachments({
     }
   }
 
-  async function remove(id: string) {
-    const res = await fetch(
-      `/api/diaries/${diaryId}/attachments?id=${encodeURIComponent(id)}`,
-      {
-        method: "DELETE",
-      }
-    );
-    if (res.ok) {
-      setFiles((prev) => prev.filter((x) => x.id !== id));
-      // Remove from image URLs
+  const removeMutation = useMutation({
+    mutationKey: ["attachments-remove", diaryId],
+    mutationFn: async (id: string) => {
+      const res = await fetch(
+        `/api/diaries/${diaryId}/attachments?id=${encodeURIComponent(id)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      return id;
+    },
+    onSuccess: (id: string) => {
+      setFiles((prev) => {
+        const filtered = prev.filter((x) => x.id !== id);
+        queryClient.setQueryData(draftKey, filtered);
+        return filtered;
+      });
       setImageUrls((prev) => {
         const newUrls = { ...prev };
         delete newUrls[id];
         return newUrls;
       });
       toast({ title: "Attachment removed" });
-    } else {
+      // Optimistically update cached diary then invalidate to re-validate
+      queryClient.setQueryData(["diary", diaryId], (old: unknown) => {
+        if (!old || typeof old !== "object") return old;
+        const current = old as { attachments?: Attachment[] } & Record<
+          string,
+          unknown
+        >;
+        const filtered = (current.attachments || []).filter((x) => x.id !== id);
+        return { ...current, attachments: filtered };
+      });
+      queryClient.invalidateQueries({ queryKey: ["diary", diaryId] });
+    },
+    onError: () => {
       toast({ title: "Failed to remove", variant: "destructive" });
-    }
+    },
+  });
+
+  async function remove(id: string) {
+    await removeMutation.mutateAsync(id);
   }
 
   const getFileIcon = (mimeType: string | null | undefined) => {
@@ -189,15 +288,24 @@ export function Attachments({
         accept="image/*,application/pdf"
         className="sr-only"
         onChange={onInputChange}
-        disabled={!canAddMore || busy}
+        disabled={
+          !canAddMore || uploadMutation.isPending || removeMutation.isPending
+        }
       />
 
       <div
         role="button"
         tabIndex={0}
-        onClick={() => canAddMore && !busy && inputRef.current?.click()}
+        onClick={() =>
+          canAddMore && !uploadMutation.isPending && inputRef.current?.click()
+        }
         onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && canAddMore && !busy) {
+          if (
+            (e.key === "Enter" || e.key === " ") &&
+            canAddMore &&
+            !uploadMutation.isPending &&
+            !removeMutation.isPending
+          ) {
             inputRef.current?.click();
           }
         }}
@@ -208,9 +316,14 @@ export function Attachments({
           "rounded-2xl border-2 border-dashed p-6 sm:p-8 cursor-pointer transition-all duration-200",
           "border-emerald-300/60 bg-emerald-50/40 hover:bg-emerald-50/60",
           dragActive && "bg-emerald-100 ring-2 ring-emerald-400 scale-105",
-          (!canAddMore || busy) && "opacity-60 cursor-not-allowed"
+          (!canAddMore ||
+            uploadMutation.isPending ||
+            removeMutation.isPending) &&
+            "opacity-60 cursor-not-allowed"
         )}
-        aria-disabled={!canAddMore || busy}
+        aria-disabled={
+          !canAddMore || uploadMutation.isPending || removeMutation.isPending
+        }
       >
         <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
           <UploadCloud
@@ -218,7 +331,7 @@ export function Attachments({
           />
           <p className="text-sm font-medium">
             {canAddMore
-              ? busy
+              ? uploadMutation.isPending || removeMutation.isPending
                 ? "Uploading…"
                 : "Select files to upload or drag & drop here"
               : "Max 3 files reached"}
