@@ -9,7 +9,7 @@ import React, {
   useCallback,
 } from "react";
 import { format } from "date-fns";
-import { Trash, FileText, Upload, X } from "lucide-react";
+import { Trash, FileText, Upload, X, Info } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
@@ -43,6 +43,8 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 
 import { ProductEditor } from "@/components/products/ProductEditor";
+import CustomerSearch from "@/components/customers/CustomerSearch";
+import QuickCustomerStats from "@/components/customers/QuickCustomerStats";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +65,7 @@ const section = {
 
 // ------- Lightweight types -------
 interface Customer {
+  id?: string;
   name: string;
   email: string;
   phone: string;
@@ -285,6 +288,8 @@ export default function NewDiaryForm() {
     preferredContact: "",
   });
 
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+
   const [draftFiles, setDraftFiles] = useState<File[]>([]);
   const [what, setWhat] = useState("");
   const [priority, setPriority] = useState<
@@ -293,7 +298,7 @@ export default function NewDiaryForm() {
 
   // meta
   const [tags, setTags] = useState("");
-  const [storeLocation, setStoreLocation] = useState("");
+  const [storeLocation, setStoreLocation] = useState("none");
   const [dueDate, setDueDate] = useState<Date | undefined>();
 
   // order
@@ -321,6 +326,29 @@ export default function NewDiaryForm() {
   // Optimized handlers with useCallback
   const updateCustomer = useCallback((field: keyof Customer, value: string) => {
     setCustomer((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleCustomerSelect = useCallback((customer: any) => {
+    if (customer) {
+      setSelectedCustomer(customer);
+      setCustomer({
+        id: customer.id,
+        name: customer.name,
+        email: customer.email || "",
+        phone: customer.phone || "",
+        accountNo: customer.accountNo || "",
+        preferredContact: "",
+      });
+    } else {
+      setSelectedCustomer(null);
+      setCustomer({
+        name: "",
+        email: "",
+        phone: "",
+        accountNo: "",
+        preferredContact: "",
+      });
+    }
   }, []);
 
   const updateFlags = useCallback((field: keyof FlagsState, value: any) => {
@@ -356,11 +384,16 @@ export default function NewDiaryForm() {
 
   async function submit() {
     const payload = {
-      customerInline: customer.name ? customer : undefined,
+      customerId: selectedCustomer?.id,
+      customerInline: selectedCustomer
+        ? undefined
+        : customer.name
+        ? customer
+        : undefined,
       whatTheyWant: what,
       priority,
       tags,
-      storeLocation,
+      storeLocation: storeLocation === "none" ? "" : storeLocation,
       dueDate: sendDate(dueDate),
 
       isPaid: flags.isPaid,
@@ -422,7 +455,7 @@ export default function NewDiaryForm() {
     <Badge
       variant="secondary"
       className={cn(
-        "px-2.5 py-1 rounded-full text-xs font-medium border",
+        "h-9 px-3 rounded-full text-sm font-medium border transition-colors",
         value === "Low" && "bg-emerald-50 text-emerald-700 border-emerald-200",
         value === "Normal" && "bg-slate-50 text-slate-700 border-slate-200",
         value === "High" && "bg-amber-50 text-amber-700 border-amber-200",
@@ -463,7 +496,10 @@ export default function NewDiaryForm() {
       <Label className="text-sm font-semibold pb-2">{label}</Label>
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="justify-start font-normal h-10">
+          <Button
+            variant="outline"
+            className="justify-start font-normal h-9 px-3 rounded-full border transition-colors"
+          >
             {value ? (
               format(value, "dd MMM yyyy")
             ) : (
@@ -498,10 +534,17 @@ export default function NewDiaryForm() {
         <div className="hidden md:flex items-center gap-2">
           <PriorityChip value={priority} />
           <Separator orientation="vertical" className="h-6" />
-          <Button variant="outline" onClick={() => history.back()}>
+          <Button
+            variant="outline"
+            className="h-9 px-3 rounded-full border transition-colors"
+            onClick={() => history.back()}
+          >
             Cancel
           </Button>
-          <Button className="bg-green-600 hover:bg-green-700" onClick={submit}>
+          <Button
+            className="h-9 px-3 rounded-full bg-green-600 hover:bg-green-700 border border-green-600 hover:border-green-700 text-white transition-colors"
+            onClick={submit}
+          >
             Create Diary
           </Button>
         </div>
@@ -516,64 +559,108 @@ export default function NewDiaryForm() {
                 Customer
               </CardTitle>
               <CardDescription>
-                Use the below card to add any customer details to the customer
-                diary.
+                Search for an existing customer or create a new one for this
+                diary entry.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid lg:grid-cols-2 gap-4">
+            <CardContent className="space-y-4">
+              {/* Customer Search */}
               <div>
-                <Label className="text-sm font-semibold pb-2">Name</Label>
-                <Input
-                  placeholder="John Doe"
-                  value={customer.name}
-                  onChange={(e) => updateCustomer("name", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-semibold pb-2">Email</Label>
-                <Input
-                  type="email"
-                  placeholder="john@example.com"
-                  value={customer.email}
-                  onChange={(e) => updateCustomer("email", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-semibold pb-2">Phone</Label>
-                <Input
-                  value={customer.phone}
-                  placeholder="021......."
-                  onChange={(e) => updateCustomer("phone", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-semibold pb-2">Account #</Label>
-                <Input
-                  value={customer.accountNo}
-                  placeholder="A12..."
-                  onChange={(e) => updateCustomer("accountNo", e.target.value)}
-                />
-              </div>
-              <div className="lg:col-span-2">
                 <Label className="text-sm font-semibold pb-2">
-                  Preferred contact
+                  Find Customer
                 </Label>
-                <Select
-                  value={customer.preferredContact}
-                  onValueChange={(v: any) =>
-                    setCustomer({ ...customer, preferredContact: v })
-                  }
-                >
-                  <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sms">SMS</SelectItem>
-                    <SelectItem value="call">Call</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                  </SelectContent>
-                </Select>
+                <CustomerSearch
+                  onSelect={handleCustomerSelect}
+                  selectedCustomer={selectedCustomer}
+                  placeholder="Search by name, email, phone, or account #..."
+                />
               </div>
+
+              {/* Show customer stats when selected */}
+              {selectedCustomer && (
+                <QuickCustomerStats customer={selectedCustomer} />
+              )}
+
+              {/* Manual Customer Entry (only if no customer selected) */}
+              {!selectedCustomer && (
+                <>
+                  <div className="text-sm text-muted-foreground bg-blue-50 p-3 rounded-lg border border-blue-200 flex items-center gap-2">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <span>
+                      <strong>Tip:</strong> If this is a new customer, fill in
+                      their details below.
+                    </span>
+                  </div>
+
+                  <div className="grid lg:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-semibold pb-2">Name</Label>
+                      <Input
+                        placeholder="John Doe"
+                        value={customer.name}
+                        onChange={(e) => updateCustomer("name", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-semibold pb-2">
+                        Email
+                      </Label>
+                      <Input
+                        type="email"
+                        placeholder="john@example.com"
+                        value={customer.email}
+                        onChange={(e) =>
+                          updateCustomer("email", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-semibold pb-2">
+                        Phone
+                      </Label>
+                      <Input
+                        value={customer.phone}
+                        placeholder="021......."
+                        onChange={(e) =>
+                          updateCustomer("phone", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-semibold pb-2">
+                        Account #
+                      </Label>
+                      <Input
+                        value={customer.accountNo}
+                        placeholder="A12..."
+                        onChange={(e) =>
+                          updateCustomer("accountNo", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="lg:col-span-2">
+                      <Label className="text-sm font-semibold pb-2">
+                        Preferred contact
+                      </Label>
+                      <Select
+                        value={customer.preferredContact}
+                        onValueChange={(v: any) =>
+                          setCustomer({ ...customer, preferredContact: v })
+                        }
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sms">SMS</SelectItem>
+                          <SelectItem value="call">Call</SelectItem>
+                          <SelectItem value="email">Email</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </motion.section>
@@ -598,11 +685,37 @@ export default function NewDiaryForm() {
                 <Label className="text-sm font-semibold pb-2">
                   Store location
                 </Label>
-                <Input
-                  placeholder="Christchurch / Riccarton"
-                  value={storeLocation}
-                  onChange={(e) => setStoreLocation(e.target.value)}
-                />
+                <Select value={storeLocation} onValueChange={setStoreLocation}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select store location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No store selected</SelectItem>
+                    {/* Auckland Region */}
+                    <SelectItem value="Albany">Albany</SelectItem>
+                    <SelectItem value="Gulf Harbour">Gulf Harbour</SelectItem>
+                    <SelectItem value="Half Moon Bay">Half Moon Bay</SelectItem>
+                    <SelectItem value="Manukau">Manukau</SelectItem>
+                    <SelectItem value="Mt Wellington">Mt Wellington</SelectItem>
+                    <SelectItem value="Westgate">Westgate</SelectItem>
+                    <SelectItem value="Westhaven">Westhaven</SelectItem>
+                    {/* Upper North Island */}
+                    <SelectItem value="Hamilton">Hamilton</SelectItem>
+                    <SelectItem value="Mt Maunganui">Mt Maunganui</SelectItem>
+                    <SelectItem value="Tauranga">Tauranga</SelectItem>
+                    <SelectItem value="Whangārei">Whangārei</SelectItem>
+                    <SelectItem value="Opua">Opua</SelectItem>
+                    <SelectItem value="Napier">Napier</SelectItem>
+                    {/* Lower North Island */}
+                    <SelectItem value="Kapiti">Kapiti</SelectItem>
+                    <SelectItem value="Seaview">Seaview</SelectItem>
+                    {/* South Island */}
+                    <SelectItem value="Nelson">Nelson</SelectItem>
+                    <SelectItem value="Waikawa">Waikawa</SelectItem>
+                    <SelectItem value="Northwood">Northwood</SelectItem>
+                    <SelectItem value="Riccarton">Riccarton</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="lg:col-span-2">
                 <Label className="pb-2 text-sm font-semibold">
@@ -841,7 +954,7 @@ export default function NewDiaryForm() {
 
       <div className="flex justify-end mt-4">
         <Button
-          className="bg-green-600 hover:bg-green-700 w-full h-12 text-md"
+          className="bg-green-600 hover:bg-green-700 border border-green-600 hover:border-green-700 text-white w-full h-12 text-md rounded-full transition-colors"
           onClick={submit}
         >
           Create
@@ -854,7 +967,7 @@ export default function NewDiaryForm() {
           Total ~ ${total.toFixed(2)}
         </div>
         <Button
-          className="bg-green-600 hover:bg-green-700 w-36"
+          className="bg-green-600 hover:bg-green-700 border border-green-600 hover:border-green-700 text-white w-36 h-9 rounded-full transition-colors"
           onClick={submit}
         >
           Create Diary

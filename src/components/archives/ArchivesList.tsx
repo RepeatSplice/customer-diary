@@ -388,7 +388,8 @@ export default function ArchivesList() {
                 <SelectItem value="all">Status: All</SelectItem>
                 <SelectItem value="Pending">Pending</SelectItem>
                 <SelectItem value="Ordered">Ordered</SelectItem>
-                <SelectItem value="ReadyForPickup">Ready for Pickup</SelectItem>
+                <SelectItem value="Ready">Ready</SelectItem>
+                <SelectItem value="Waiting">Waiting Reply</SelectItem>
                 <SelectItem value="Collected">Collected</SelectItem>
                 <SelectItem value="Cancelled">Cancelled</SelectItem>
               </SelectContent>
@@ -586,7 +587,8 @@ export default function ArchivesList() {
                           d.status as
                             | "Pending"
                             | "Ordered"
-                            | "ReadyForPickup"
+                            | "Ready"
+                            | "Waiting"
                             | "Collected"
                             | "Cancelled"
                         }

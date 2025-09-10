@@ -83,7 +83,7 @@ export const diaryCreateSchema = z.object({
 
 export const diaryPatchSchema = z.object({
   status: z
-    .enum(["Pending", "Ordered", "ReadyForPickup", "Collected", "Cancelled"])
+    .enum(["Pending", "Ordered", "Ready", "Waiting", "Collected", "Cancelled"])
     .optional(),
   priority: z.enum(["Low", "Normal", "High", "Urgent"]).optional(),
   isPaid: z.boolean().optional(),

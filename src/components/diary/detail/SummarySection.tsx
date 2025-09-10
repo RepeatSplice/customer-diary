@@ -23,7 +23,8 @@ import { Mail, Phone, Hash, User } from "lucide-react";
 export const STATUS_LABELS: Record<string, string> = {
   Pending: "Pending",
   Ordered: "Ordered",
-  ReadyForPickup: "Ready for Pickup",
+  Ready: "Ready",
+  Waiting: "Waiting Reply",
   Collected: "Collected",
   Cancelled: "Cancelled",
 };
@@ -223,11 +224,42 @@ export function StatusFlagsCard({
 
         <div>
           <Label className="text-sm font-semibold pb-2">Store location</Label>
-          <Input
-            value={form.storeLocation || ""}
-            onChange={(e) => set("storeLocation", e.target.value)}
-            placeholder="e.g. Christchurch / Riccarton"
-          />
+          <Select
+            value={form.storeLocation || "none"}
+            onValueChange={(value) =>
+              set("storeLocation", value === "none" ? "" : value)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select store location" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No store selected</SelectItem>
+              {/* Auckland Region */}
+              <SelectItem value="Albany">Albany</SelectItem>
+              <SelectItem value="Gulf Harbour">Gulf Harbour</SelectItem>
+              <SelectItem value="Half Moon Bay">Half Moon Bay</SelectItem>
+              <SelectItem value="Manukau">Manukau</SelectItem>
+              <SelectItem value="Mt Wellington">Mt Wellington</SelectItem>
+              <SelectItem value="Westgate">Westgate</SelectItem>
+              <SelectItem value="Westhaven">Westhaven</SelectItem>
+              {/* Upper North Island */}
+              <SelectItem value="Hamilton">Hamilton</SelectItem>
+              <SelectItem value="Mt Maunganui">Mt Maunganui</SelectItem>
+              <SelectItem value="Tauranga">Tauranga</SelectItem>
+              <SelectItem value="Whangārei">Whangārei</SelectItem>
+              <SelectItem value="Opua">Opua</SelectItem>
+              <SelectItem value="Napier">Napier</SelectItem>
+              {/* Lower North Island */}
+              <SelectItem value="Kapiti">Kapiti</SelectItem>
+              <SelectItem value="Seaview">Seaview</SelectItem>
+              {/* South Island */}
+              <SelectItem value="Nelson">Nelson</SelectItem>
+              <SelectItem value="Waikawa">Waikawa</SelectItem>
+              <SelectItem value="Northwood">Northwood</SelectItem>
+              <SelectItem value="Riccarton">Riccarton</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div>
           <Label className="text-sm font-semibold pb-2">Assigned to</Label>

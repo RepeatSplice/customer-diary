@@ -18,7 +18,8 @@ export const role_t = pgEnum("role_t", ["staff", "manager"]);
 export const status_t = pgEnum("status_t", [
   "Pending",
   "Ordered",
-  "ReadyForPickup",
+  "Ready",
+  "Waiting",
   "Collected",
   "Cancelled",
 ]);
