@@ -162,7 +162,7 @@ export default function DashboardPage() {
 
   // pagination
   const [currentPage, setCurrentPage] = React.useState(1);
-  const [itemsPerPage, setItemsPerPage] = React.useState(12);
+  const [itemsPerPage, setItemsPerPage] = React.useState(8);
   const [updatingStatus, setUpdatingStatus] = React.useState<string | null>(
     null
   );
@@ -918,9 +918,9 @@ export default function DashboardPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="8">8</SelectItem>
+                <SelectItem value="16">16</SelectItem>
+                <SelectItem value="24">24</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -933,22 +933,23 @@ export default function DashboardPage() {
                 size="sm"
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="h-8 px-2 text-xs"
+                className="h-8 px-3 text-xs"
               >
-                <ChevronLeft className="h-3 w-3" />
+                <ChevronLeft className="h-3 w-3 mr-1" />
+                Previous
               </Button>
 
               <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
                   let pageNum;
-                  if (totalPages <= 5) {
+                  if (totalPages <= 7) {
                     pageNum = i + 1;
-                  } else if (currentPage <= 3) {
+                  } else if (currentPage <= 4) {
                     pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
+                  } else if (currentPage >= totalPages - 3) {
+                    pageNum = totalPages - 6 + i;
                   } else {
-                    pageNum = currentPage - 2 + i;
+                    pageNum = currentPage - 3 + i;
                   }
 
                   return (
@@ -957,7 +958,12 @@ export default function DashboardPage() {
                       variant={currentPage === pageNum ? "default" : "outline"}
                       size="sm"
                       onClick={() => setCurrentPage(pageNum)}
-                      className="h-8 w-8 p-0 text-xs"
+                      className={cn(
+                        "h-8 w-8 p-0 text-xs font-medium",
+                        currentPage === pageNum
+                          ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                          : "border-slate-300 text-slate-700 hover:bg-slate-50"
+                      )}
                     >
                       {pageNum}
                     </Button>
@@ -972,9 +978,10 @@ export default function DashboardPage() {
                   setCurrentPage(Math.min(totalPages, currentPage + 1))
                 }
                 disabled={currentPage === totalPages}
-                className="h-8 px-2 text-xs"
+                className="h-8 px-3 text-xs"
               >
-                <ChevronRight className="h-3 w-3" />
+                Next
+                <ChevronRight className="h-3 w-3 ml-1" />
               </Button>
             </div>
           )}
