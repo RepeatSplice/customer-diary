@@ -23,6 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import RefreshButton from "@/components/RefreshButton";
+import { DiarySaveButton } from "@/components/diary/SaveButton";
 
 import { toast } from "@/components/ui/use-toast";
 import { ArrowUp, Pin, PinOff, MessageSquareText, Trash2 } from "lucide-react";
@@ -325,6 +327,7 @@ export default function FeedbackPage() {
           </h1>
           <p className="text-gray-600 mt-1">Share ideas and report issues</p>
         </div>
+        <RefreshButton />
       </div>
 
       {/* Header controls */}
@@ -464,13 +467,15 @@ export default function FeedbackPage() {
               </div>
 
               <div className="flex justify-end">
-                <Button
-                  type="submit"
+                <DiarySaveButton
+                  onClick={() =>
+                    create(new Event("submit") as unknown as React.FormEvent)
+                  }
                   disabled={busy}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"
-                >
-                  {busy ? "Saving…" : "Submit"}
-                </Button>
+                  isSaving={busy}
+                  label="Submit"
+                  className="h-9 px-3 text-sm"
+                />
               </div>
             </form>
           </CardContent>

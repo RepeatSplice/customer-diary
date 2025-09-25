@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { toast } from "@/components/ui/use-toast";
+import RefreshButton from "@/components/RefreshButton";
 
 // ---------------- Types ----------------
 interface ArchivedDiaryRow {
@@ -348,15 +349,7 @@ export default function ArchivesList() {
             or permanently delete them.
           </p>
         </div>
-        <Button
-          onClick={fetchArchivedDiaries}
-          variant="outline"
-          size="lg"
-          className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 hover:scale-105 transition-all duration-300 shadow-sm"
-        >
-          <RotateCcw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <RefreshButton />
       </div>
 
       {error && (
@@ -366,7 +359,7 @@ export default function ArchivesList() {
       )}
 
       {/* Enhanced Filter/Search Section - optimized for smaller screens */}
-      <Card className="rounded-2xl border-rounded shadow-lg mb-6 sm:mb-8 bg-gradient-to-r from-gray-50 to-gray-100">
+      <Card className="rounded-2xl border-rounded shadow-lg mb-6 sm:mb-8 bg-white">
         <CardContent className="p-4 sm:p-6">
           {/* Row 1: search + quick filters to the right */}
           <div className="flex flex-wrap items-center gap-3">
@@ -727,7 +720,7 @@ export default function ArchivesList() {
 
           {/* Footer / pagination */}
           {!loading && filtered.length > 0 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/30">
+            <div className="flex items-center justify-between px-4 py-3 border-t bg-white">
               <div className="text-xs text-muted-foreground">
                 Showing{" "}
                 <span className="font-medium">{(page - 1) * pageSize + 1}</span>

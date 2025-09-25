@@ -1,4 +1,3 @@
-// src/app/(app)/dashboard/page.tsx
 "use client";
 
 import * as React from "react";
@@ -72,11 +71,11 @@ interface DiaryRow {
   status: Status;
   priority: Priority;
   total: number | string | null;
-  createdAt: string; // ISO
+  createdAt: string;
   dueDate?: string | null;
   isPaid?: boolean | null;
-  staff?: string | null; // createdByCode or display name
-  assignedTo?: string | null; // assigned staff member
+  staff?: string | null;
+  assignedTo?: string | null;
   customer?: {
     id: string;
     name: string | null;
@@ -84,10 +83,9 @@ interface DiaryRow {
     phone?: string | null;
     accountNo?: string | null;
   } | null;
-  tags?: string | null; // comma-separated if you store it
+  tags?: string | null;
 }
 
-// API response type for diaries
 interface DiaryApiResponse {
   id: string;
   whatTheyWant?: string | null;
@@ -163,6 +161,7 @@ export default function DashboardPage() {
   // pagination
   const [currentPage, setCurrentPage] = React.useState(1);
   const [itemsPerPage, setItemsPerPage] = React.useState(8);
+  const [activeOnly, setActiveOnly] = React.useState(true);
   const [updatingStatus, setUpdatingStatus] = React.useState<string | null>(
     null
   );
@@ -227,6 +226,7 @@ export default function DashboardPage() {
     toDate,
     debouncedSearch,
     tagQuery,
+    activeOnly,
   ]);
 
   // Refresh when page becomes visible (e.g., user returns from archives)
@@ -249,12 +249,13 @@ export default function DashboardPage() {
   }, [activeRows]);
 
   const stats = React.useMemo(() => {
+    const activeList = [...(activeRows ?? [])];
     const all = [...(activeRows ?? []), ...(archivedRows ?? [])];
     const now = new Date();
-    const active = all.filter(
+    const active = activeList.filter(
       (r) => !["Collected", "Cancelled"].includes(r.status)
     ).length;
-    const overdue = all.filter((r) => {
+    const overdue = activeList.filter((r) => {
       if (!r.dueDate) return false;
       return (
         new Date(r.dueDate) < now &&
@@ -274,7 +275,8 @@ export default function DashboardPage() {
 
   // Click handlers for stats cards
   const handleActiveClick = React.useCallback(() => {
-    // Filter for active statuses (non-completed/cancelled)
+    // Show only active statuses (non-completed/cancelled)
+    setActiveOnly(true);
     setStatus("all");
     setPriority("all");
     setPaid("all");
@@ -284,7 +286,6 @@ export default function DashboardPage() {
     setToDate(undefined);
     setSearch("");
     setTagQuery("");
-    // This will show all active diaries (pending, ordered, ready for pickup)
   }, []);
 
   const handleOverdueClick = React.useCallback(() => {
@@ -319,6 +320,7 @@ export default function DashboardPage() {
     setFromDate(undefined);
     setToDate(undefined);
     setTagQuery("");
+    setActiveOnly(true);
   }, []);
 
   // Count active filters
@@ -412,9 +414,10 @@ export default function DashboardPage() {
   ]);
 
   // Pagination
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
+  const itemsPerPageResolved = activeOnly ? filtered.length || 1 : itemsPerPage;
+  const totalPages = Math.ceil(filtered.length / itemsPerPageResolved);
+  const startIndex = (currentPage - 1) * itemsPerPageResolved;
+  const endIndex = startIndex + itemsPerPageResolved;
   const paginatedData = filtered.slice(startIndex, endIndex);
 
   return (
@@ -440,7 +443,7 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* Enhanced Stat cards - optimized for smaller screens */}
+      {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <motion.div variants={fadeIn} initial="hidden" animate="show">
           <Card
@@ -574,10 +577,9 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* Enhanced Search & Filter Section */}
+      {/* Filter Section */}
       <Card className="rounded-2xl shadow-lg mb-6 sm:mb-8 bg-white border border-slate-200">
         <CardContent className="p-6">
-          {/* Header with Clear Filters */}
           <div className="flex items-center justify-between mb-6">
             <div>
               <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -1084,7 +1086,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    {/* Contact Info Grid - Enhanced */}
+                    {/* Contact Info Grid  */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                       <Card className="border border-slate-200 shadow-sm">
                         <CardContent className="p-3 text-center">

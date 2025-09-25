@@ -25,8 +25,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+// import { Badge } from "@/components/ui/badge";
+// import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -47,6 +47,7 @@ import CustomerSearch from "@/components/customers/CustomerSearch";
 import QuickCustomerStats from "@/components/customers/QuickCustomerStats";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { DiarySaveButton } from "@/components/diary/SaveButton";
 
 // ------- Motion (subtle) -------
 const page = {
@@ -322,6 +323,13 @@ export default function NewDiaryForm() {
   // products + notes
   const [products, setProducts] = useState<any[]>([]);
   const [adminNotes, setAdminNotes] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [errors, setErrors] = useState<{
+    customer?: string;
+    what?: string;
+    details?: string;
+    flags?: string;
+  }>({});
 
   // Optimized handlers with useCallback
   const updateCustomer = useCallback((field: keyof Customer, value: string) => {
@@ -382,7 +390,41 @@ export default function NewDiaryForm() {
     }
   }, [products]);
 
+  function validate(): boolean {
+    const next: {
+      customer?: string;
+      what?: string;
+      details?: string;
+      flags?: string;
+    } = {};
+    if (!selectedCustomer && !customer.name.trim()) {
+      next.customer = "Select an existing customer or enter a name.";
+    }
+    if (!what.trim()) {
+      next.what = "Please describe the customer's enquiry.";
+    }
+    if (!dueDate || storeLocation === "none") {
+      next.details = "Add a due date and select a store location.";
+    }
+    if (flags.isPaid && (!flags.paymentMethod || !flags.amountPaid)) {
+      next.flags =
+        "When Paid is on, select a payment method and enter amount paid.";
+    }
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
   async function submit() {
+    if (!validate()) {
+      toast({
+        title: "Missing information",
+        description: "Please fix the highlighted fields and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
     const payload = {
       customerId: selectedCustomer?.id,
       customerInline: selectedCustomer
@@ -414,57 +456,84 @@ export default function NewDiaryForm() {
       total: total.toFixed(2),
     };
 
-    const res = await fetch("/api/diaries", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const res = await fetch("/api/diaries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    if (res.ok) {
+      if (!res.ok) {
+        let message = "";
+        try {
+          const j = await res.json();
+          message = j?.message || JSON.stringify(j);
+        } catch {
+          message = await res.text();
+        }
+        throw new Error(
+          message || `Server error ${res.status}. Please try again.`
+        );
+      }
+
       const d = await res.json();
 
       // Upload any draft files now that we have a diary id
+      let failedUploads = 0;
       for (const file of draftFiles) {
-        const fd = new FormData();
-        fd.append("file", file);
-        await fetch(`/api/diaries/${d.id}/attachments`, {
-          method: "POST",
-          body: fd,
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          const up = await fetch(`/api/diaries/${d.id}/attachments`, {
+            method: "POST",
+            body: fd,
+          });
+          if (!up.ok) failedUploads++;
+        } catch {
+          failedUploads++;
+        }
+      }
+
+      if (failedUploads > 0) {
+        toast({
+          title: "Some files failed to upload",
+          description: `${failedUploads} attachment(s) could not be uploaded. You can add them later from the diary page.`,
         });
       }
 
       toast({ title: "Diary created", description: "Redirecting…" });
       window.location.href = `/diaries/${d.id}`;
-    } else {
-      const errorText = await res.text();
-      console.error("Create failed:", errorText);
+    } catch (err: any) {
+      console.error("Create failed:", err);
       toast({
         title: "Failed to create diary",
-        description: errorText || "Please check your input and try again",
+        description: err?.message || "Network error. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   }
 
   // ------- UI helpers -------
-  const PriorityChip = ({
-    value,
-  }: {
-    value: "Low" | "Normal" | "High" | "Urgent";
-  }) => (
-    <Badge
-      variant="secondary"
-      className={cn(
-        "h-9 px-3 rounded-full text-sm font-medium border transition-colors",
-        value === "Low" && "bg-emerald-50 text-emerald-700 border-emerald-200",
-        value === "Normal" && "bg-slate-50 text-slate-700 border-slate-200",
-        value === "High" && "bg-amber-50 text-amber-700 border-amber-200",
-        value === "Urgent" && "bg-red-50 text-red-700 border-red-200"
-      )}
-    >
-      {value}
-    </Badge>
-  );
+  // const PriorityChip = ({
+  //   value,
+  // }: {
+  //   value: "Low" | "Normal" | "High" | "Urgent";
+  // }) => (
+  //   <Badge
+  //     variant="secondary"
+  //     className={cn(
+  //       "h-9 px-3 rounded-full text-sm font-medium border transition-colors",
+  //       value === "Low" && "bg-emerald-50 text-emerald-700 border-emerald-200",
+  //       value === "Normal" && "bg-slate-50 text-slate-700 border-slate-200",
+  //       value === "High" && "bg-amber-50 text-amber-700 border-amber-200",
+  //       value === "Urgent" && "bg-red-50 text-red-700 border-red-200"
+  //     )}
+  //   >
+  //     {value}
+  //   </Badge>
+  // );
 
   const sendDate = (d?: Date) => (d ? format(d, "yyyy-MM-dd") : undefined);
 
@@ -524,32 +593,8 @@ export default function NewDiaryForm() {
       initial="hidden"
       animate="show"
       variants={page}
-      className="mx-auto w-full  px-6 pb-28"
+      className="w-full pb-28"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 mb-5">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          New Customer Diary
-        </h1>
-        <div className="hidden md:flex items-center gap-2">
-          <PriorityChip value={priority} />
-          <Separator orientation="vertical" className="h-6" />
-          <Button
-            variant="outline"
-            className="h-9 px-3 rounded-full border transition-colors"
-            onClick={() => history.back()}
-          >
-            Cancel
-          </Button>
-          <Button
-            className="h-9 px-3 rounded-full bg-green-600 hover:bg-green-700 border border-green-600 hover:border-green-700 text-white transition-colors"
-            onClick={submit}
-          >
-            Create Diary
-          </Button>
-        </div>
-      </div>
-
       <div className="grid gap-6">
         {/* Customer */}
         <motion.section variants={section} custom={1}>
@@ -564,6 +609,12 @@ export default function NewDiaryForm() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {errors.customer && (
+                <div className="text-sm text-red-800 bg-red-50 p-3 rounded-lg border border-red-200 flex items-center gap-2">
+                  <Info className="h-4 w-4 text-red-600" />
+                  <span>{errors.customer}</span>
+                </div>
+              )}
               {/* Customer Search */}
               <div>
                 <Label className="text-sm font-semibold pb-2">
@@ -584,14 +635,6 @@ export default function NewDiaryForm() {
               {/* Manual Customer Entry (only if no customer selected) */}
               {!selectedCustomer && (
                 <>
-                  <div className="text-sm text-muted-foreground bg-blue-50 p-3 rounded-lg border border-blue-200 flex items-center gap-2">
-                    <Info className="h-4 w-4 text-blue-600" />
-                    <span>
-                      <strong>Tip:</strong> If this is a new customer, fill in
-                      their details below.
-                    </span>
-                  </div>
-
                   <div className="grid lg:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-sm font-semibold pb-2">Name</Label>
@@ -676,6 +719,12 @@ export default function NewDiaryForm() {
               </CardDescription>
             </CardHeader>
             <CardContent className="grid lg:grid-cols-2 gap-4">
+              {errors.details && (
+                <div className="lg:col-span-2 text-sm text-red-800 bg-red-50 p-3 rounded-lg border border-red-200 flex items-center gap-2">
+                  <Info className="h-4 w-4 text-red-600" />
+                  <span>{errors.details}</span>
+                </div>
+              )}
               <DateField
                 label="Due date"
                 value={dueDate}
@@ -754,6 +803,12 @@ export default function NewDiaryForm() {
                   value={what}
                   onChange={(e) => setWhat(e.target.value)}
                 />
+                {errors.what && (
+                  <div className="mt-2 text-sm text-red-800 bg-red-50 p-3 rounded-lg border border-red-200 flex items-center gap-2">
+                    <Info className="h-4 w-4 text-red-600" />
+                    <span>{errors.what}</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -793,6 +848,12 @@ export default function NewDiaryForm() {
               </CardDescription>
             </CardHeader>
             <CardContent className="grid lg:grid-cols-3 gap-4">
+              {errors.flags && (
+                <div className="lg:col-span-3 text-sm text-red-800 bg-red-50 p-3 rounded-lg border border-red-200 flex items-center gap-2">
+                  <Info className="h-4 w-4 text-red-600" />
+                  <span>{errors.flags}</span>
+                </div>
+              )}
               <div className="flex items-center space-x-2">
                 <Switch
                   id="isPaid"
@@ -952,13 +1013,14 @@ export default function NewDiaryForm() {
         </motion.section>
       </div>
 
-      <div className="flex justify-end mt-4">
-        <Button
-          className="bg-green-600 hover:bg-green-700 border border-green-600 hover:border-green-700 text-white w-full h-12 text-md rounded-full transition-colors"
+      <div className="flex mt-6">
+        <DiarySaveButton
           onClick={submit}
-        >
-          Create
-        </Button>
+          label="Create diary entry"
+          className="w-full h-12 text-base font-semibold shadow-md hover:shadow-lg"
+          isSaving={isSaving}
+          disabled={isSaving}
+        />
       </div>
 
       {/* Sticky action (mobile) */}
@@ -966,12 +1028,13 @@ export default function NewDiaryForm() {
         <div className="text-sm text-muted-foreground flex-1">
           Total ~ ${total.toFixed(2)}
         </div>
-        <Button
-          className="bg-green-600 hover:bg-green-700 border border-green-600 hover:border-green-700 text-white w-36 h-9 rounded-full transition-colors"
+        <DiarySaveButton
           onClick={submit}
-        >
-          Create Diary
-        </Button>
+          label="Create Diary"
+          className="w-36"
+          isSaving={isSaving}
+          disabled={isSaving}
+        />
       </div>
     </motion.div>
   );

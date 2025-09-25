@@ -3,7 +3,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -42,6 +41,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import RefreshButton from "@/components/RefreshButton";
 
 type StaffRow = {
   id: string;
@@ -186,16 +186,18 @@ export default function StaffAdminPage() {
   }
 
   return (
-    <div className="px-6 py-6">
+    <div className="w-full px-4 sm:px-6 lg:px-8 pb-12 max-w-[1400px] mx-auto bg-white min-h-screen">
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Add User</h1>
-        <Link
-          href="/dashboard"
-          className="text-sm text-muted-foreground hover:underline"
-        >
-          Back
-        </Link>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
+            Staff Users
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Manage staff accounts and permissions
+          </p>
+        </div>
+        <RefreshButton />
       </div>
 
       {/* Create form */}
@@ -433,7 +435,7 @@ export default function StaffAdminPage() {
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between gap-3 border-t px-4 py-3">
+          <div className="flex items-center justify-between gap-3 border-t px-4 py-3 bg-white">
             <div className="text-xs text-muted-foreground">
               Page {page + 1} of {totalPages}
             </div>

@@ -248,7 +248,6 @@ export function Attachments({
         return newUrls;
       });
       toast({ title: "Attachment removed" });
-      // Optimistically update cached diary then invalidate to re-validate
       queryClient.setQueryData(["diary", diaryId], (old: unknown) => {
         if (!old || typeof old !== "object") return old;
         const current = old as { attachments?: Attachment[] } & Record<
@@ -313,9 +312,18 @@ export function Attachments({
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         className={cn(
-          "rounded-2xl border-2 border-dashed p-6 sm:p-8 cursor-pointer transition-all duration-200",
+          "rounded-2xl border-2 border-dashed p-6 sm:p-8 cursor-pointer transition-all duration-200 ",
           "border-emerald-300/60 bg-emerald-50/40 hover:bg-emerald-50/60",
-          dragActive && "bg-emerald-100 ring-2 ring-emerald-400 scale-105",
+          canAddMore &&
+            !uploadMutation.isPending &&
+            !removeMutation.isPending &&
+            "hover:cursor-copy",
+          dragActive &&
+            (canAddMore &&
+            !uploadMutation.isPending &&
+            !removeMutation.isPending
+              ? "bg-emerald-100 ring-2 ring-emerald-400 scale-105 cursor-copy"
+              : "bg-emerald-100 ring-2 ring-emerald-400 scale-105"),
           (!canAddMore ||
             uploadMutation.isPending ||
             removeMutation.isPending) &&

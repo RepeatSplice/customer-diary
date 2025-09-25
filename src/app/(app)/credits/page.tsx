@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Link from "next/link";
+// import Link from "next/link";
+import RefreshButton from "@/components/RefreshButton";
 import {
   Card,
   CardHeader,
@@ -215,16 +216,18 @@ export default function CreditsPage() {
   };
 
   return (
-    <div className="px-6 py-6">
+    <div className="w-full px-4 sm:px-6 lg:px-8 pb-12 max-w-[1400px] mx-auto bg-white min-h-screen">
       <motion.div initial="hidden" animate="show" variants={section}>
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Credits</h1>
-          <Link
-            href="/dashboard"
-            className="text-sm text-muted-foreground hover:underline"
-          >
-            Back to Dashboard
-          </Link>
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
+              Credits
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Technologies and acknowledgements
+            </p>
+          </div>
+          <RefreshButton />
         </div>
 
         {/* Built With */}
